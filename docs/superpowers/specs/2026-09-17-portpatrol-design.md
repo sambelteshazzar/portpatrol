@@ -87,7 +87,8 @@ Each knowledge base entry carries regex `match` patterns in the style of nmap's 
 - `advice` follows CIS/NIST hardening practice: close unused ports, bind services to localhost, firewall default-deny, patch per KEV priority.
 - Seed entries include: 21 FTP (high), 22 SSH (info), 23 Telnet (critical, Mirai vector), 25 SMTP (medium), 53 DNS (medium), 80/443 HTTP(S) (info), 135 RPC (high), 139 NetBIOS (high), 445 SMB (high), 5555 ADB (critical, Mirai vector), 1433 MSSQL (medium), 3306 MySQL (medium), 3389 RDP (high, BlueKeep path), 5432 PostgreSQL (medium), 5900 VNC (medium), 6379 Redis (critical when unauthenticated), 8080/8443 alt-web (medium, Mirai Wicked vector), 9200 Elasticsearch (high), 27017 MongoDB (critical when unauthenticated).
 - Ports without entries classify as `unknown` with the banner-derived service guess.
-- `top50` and `top1000` presets resolve from a built-in ordered port-frequency list shipped as package data, derived from nmap's `nmap-services` frequencies.
+- Resolution order: `~/.portpatrol/knowledge_base.json` (user override), package `portpatrol/knowledge_base.json` (ships with the defaults), then built-in Python defaults in `portpatrol/defaults.py`. First valid source wins.
+- `top50` and `top100` presets resolve from a built-in curated top-100 port list shipped as package data, drawn from nmap's top-ports knowledge. `top1000` scans the full well-known range 1-1023 plus that top-100 list.
 - The file is plain JSON. Users edit it without touching code. `portpatrol explain <port>` prints the entry for a port, or the unknown-port fallback.
 
 ## Notifications
@@ -114,7 +115,7 @@ Delivery per platform:
 ## CLI Interface
 
 ```
-portpatrol scan [--ports top50|top1000|all|SPEC] [--json] [--kev] [--verbose] [--no-notify]
+portpatrol scan [--ports top50|top100|top1000|all|SPEC] [--json] [--kev] [--verbose] [--no-notify]
 portpatrol explain <port>
 ```
 
