@@ -1,0 +1,558 @@
+[
+  {
+    "port": 7,
+    "protocol": "tcp",
+    "service": "echo",
+    "risk": "info",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Echo service is obsolete and amplifies reflection attacks. Disable it.",
+    "kev_hints": []
+  },
+  {
+    "port": 21,
+    "protocol": "tcp",
+    "service": "ftp",
+    "risk": "high",
+    "banner_first": true,
+    "probe": null,
+    "match": [
+      "^220"
+    ],
+    "advice": "FTP sends credentials in cleartext and has a long exploit history. Use SFTP or close the port.",
+    "kev_hints": [
+      "ftp"
+    ]
+  },
+  {
+    "port": 22,
+    "protocol": "tcp",
+    "service": "ssh",
+    "risk": "info",
+    "banner_first": true,
+    "probe": null,
+    "match": [
+      "^SSH-[\\d.]+-(OpenSSH[\\w.p\\-]+)"
+    ],
+    "advice": "SSH is acceptable when hardened. Disable password auth and root login, keep OpenSSH patched.",
+    "kev_hints": [
+      "openssh"
+    ]
+  },
+  {
+    "port": 23,
+    "protocol": "tcp",
+    "service": "telnet",
+    "risk": "critical",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Telnet transmits everything in cleartext and was the Mirai botnet's entry point. No modern use; close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 25,
+    "protocol": "tcp",
+    "service": "smtp",
+    "risk": "medium",
+    "banner_first": true,
+    "probe": null,
+    "match": [
+      "^220"
+    ],
+    "advice": "An exposed mail relay gets abused for spam and phishing within hours. Restrict to trusted hosts.",
+    "kev_hints": [
+      "exim"
+    ]
+  },
+  {
+    "port": 53,
+    "protocol": "tcp",
+    "service": "domain",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "An open resolver participates in DNS amplification DDoS. Bind to localhost or your LAN only.",
+    "kev_hints": []
+  },
+  {
+    "port": 110,
+    "protocol": "tcp",
+    "service": "pop3",
+    "risk": "medium",
+    "banner_first": true,
+    "probe": null,
+    "match": [
+      "^\\+OK"
+    ],
+    "advice": "POP3 sends credentials in cleartext. Use POP3S or close the port.",
+    "kev_hints": []
+  },
+  {
+    "port": 111,
+    "protocol": "tcp",
+    "service": "rpcbind",
+    "risk": "high",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "rpcbind exposes the RPC service map attackers use for recon. Firewall it from untrusted networks.",
+    "kev_hints": []
+  },
+  {
+    "port": 113,
+    "protocol": "tcp",
+    "service": "auth",
+    "risk": "info",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Ident service leaks username info to remote hosts. Close it unless something depends on it.",
+    "kev_hints": []
+  },
+  {
+    "port": 135,
+    "protocol": "tcp",
+    "service": "msrpc",
+    "risk": "high",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "The RPC endpoint mapper is the first stop for Windows recon and lateral movement. Firewall it.",
+    "kev_hints": []
+  },
+  {
+    "port": 139,
+    "protocol": "tcp",
+    "service": "netbios-ssn",
+    "risk": "high",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "NetBIOS session service leaks host info and predates modern Windows networking. Close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 143,
+    "protocol": "tcp",
+    "service": "imap",
+    "risk": "medium",
+    "banner_first": true,
+    "probe": null,
+    "match": [
+      "^\\* OK"
+    ],
+    "advice": "IMAP sends credentials in cleartext. Use IMAPS or close the port.",
+    "kev_hints": []
+  },
+  {
+    "port": 389,
+    "protocol": "tcp",
+    "service": "ldap",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Anonymous LDAP queries leak directory data. Require authentication and bind to trusted networks.",
+    "kev_hints": []
+  },
+  {
+    "port": 443,
+    "protocol": "tcp",
+    "service": "https",
+    "risk": "info",
+    "banner_first": false,
+    "probe": "HEAD / HTTP/1.0\r\n\r\n",
+    "match": [
+      "^HTTP/[\\d.]+",
+      "Server:\\s*([^\\r\\n]+)"
+    ],
+    "advice": "HTTPS is expected. Keep the TLS stack and certificates current.",
+    "kev_hints": [
+      "openssl"
+    ]
+  },
+  {
+    "port": 445,
+    "protocol": "tcp",
+    "service": "microsoft-ds",
+    "risk": "high",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Exposed SMB is the WannaCry/EternalBlue path (CVE-2017-0145). Firewall it from untrusted networks and keep patches current.",
+    "kev_hints": [
+      "ms17-010",
+      "samba"
+    ]
+  },
+  {
+    "port": 465,
+    "protocol": "tcp",
+    "service": "smtps",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "SMTPS is acceptable. Keep the TLS stack current.",
+    "kev_hints": []
+  },
+  {
+    "port": 513,
+    "protocol": "tcp",
+    "service": "login",
+    "risk": "high",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "rlogin trusts the client host and predates modern auth. Close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 514,
+    "protocol": "tcp",
+    "service": "shell",
+    "risk": "critical",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "rsh executes commands with no real authentication. Close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 515,
+    "protocol": "tcp",
+    "service": "printer",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "LPD printing is a legacy service with buffer-overflow history. Close it if unused.",
+    "kev_hints": []
+  },
+  {
+    "port": 548,
+    "protocol": "tcp",
+    "service": "afp",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "AFP file sharing is legacy Apple networking. Prefer SMB with signing or close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 554,
+    "protocol": "tcp",
+    "service": "rtsp",
+    "risk": "info",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "RTSP streams leak media server details and has default-credential issues. Bind to trusted networks.",
+    "kev_hints": []
+  },
+  {
+    "port": 5555,
+    "protocol": "tcp",
+    "service": "adb",
+    "risk": "critical",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "ADB over the network gives full device control and is a Mirai infection vector. Disable it.",
+    "kev_hints": []
+  },
+  {
+    "port": 587,
+    "protocol": "tcp",
+    "service": "submission",
+    "risk": "medium",
+    "banner_first": true,
+    "probe": null,
+    "match": [
+      "^220"
+    ],
+    "advice": "Submission is acceptable when it requires authentication. Keep it patched.",
+    "kev_hints": []
+  },
+  {
+    "port": 631,
+    "protocol": "tcp",
+    "service": "ipp",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "CUPS printing has a history of RCE bugs. Keep it patched or close if unused.",
+    "kev_hints": []
+  },
+  {
+    "port": 873,
+    "protocol": "tcp",
+    "service": "rsync",
+    "risk": "high",
+    "banner_first": true,
+    "probe": null,
+    "match": [
+      "^@RSYNCD:"
+    ],
+    "advice": "An exposed rsync daemon allows anonymous module listing and file pull. Require auth or close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 1080,
+    "protocol": "tcp",
+    "service": "socks",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "An open SOCKS proxy relays attacker traffic anonymously. Require auth or close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 1433,
+    "protocol": "tcp",
+    "service": "ms-sql-s",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Exposed SQL Server is brute-forced and ransomware-staged. Restrict to app subnets.",
+    "kev_hints": []
+  },
+  {
+    "port": 1723,
+    "protocol": "tcp",
+    "service": "pptp",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "PPTP VPN is cryptographically broken. Replace with WireGuard or close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 2049,
+    "protocol": "tcp",
+    "service": "nfs",
+    "risk": "high",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "An exported NFS share without root squashing gives effective root access. Firewall to trusted hosts.",
+    "kev_hints": []
+  },
+  {
+    "port": 3128,
+    "protocol": "tcp",
+    "service": "squid",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "An open proxy relays attacker traffic. Restrict to your LAN.",
+    "kev_hints": []
+  },
+  {
+    "port": 3306,
+    "protocol": "tcp",
+    "service": "mysql",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Exposed databases are brute-forced and dumped within hours of discovery. Bind to app subnets, require strong auth.",
+    "kev_hints": [
+      "mysql",
+      "mariadb"
+    ]
+  },
+  {
+    "port": 3389,
+    "protocol": "tcp",
+    "service": "ms-wbt-server",
+    "risk": "high",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Exposed RDP is brute-forced around the clock and was the BlueKeep path (CVE-2019-0708). Put it behind a VPN and keep patches current.",
+    "kev_hints": [
+      "bluekeep",
+      "remote desktop"
+    ]
+  },
+  {
+    "port": 3690,
+    "protocol": "tcp",
+    "service": "svn",
+    "risk": "info",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "An exposed SVN server leaks source code history. Require auth or close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 5000,
+    "protocol": "tcp",
+    "service": "upnp",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "UPnP and alt HTTP services often expose admin interfaces. Verify what listens here.",
+    "kev_hints": []
+  },
+  {
+    "port": 5060,
+    "protocol": "tcp",
+    "service": "sip",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Exposed SIP gets scanned for toll fraud. Restrict to your SIP provider.",
+    "kev_hints": []
+  },
+  {
+    "port": 5432,
+    "protocol": "tcp",
+    "service": "postgresql",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Exposed databases are brute-forced and dumped within hours of discovery. Bind to app subnets, require strong auth.",
+    "kev_hints": [
+      "postgresql"
+    ]
+  },
+  {
+    "port": 5900,
+    "protocol": "tcp",
+    "service": "vnc",
+    "risk": "medium",
+    "banner_first": true,
+    "probe": null,
+    "match": [
+      "^RFB"
+    ],
+    "advice": "VNC has weak auth and a history of unauthenticated access bugs. Tunnel over SSH or close it.",
+    "kev_hints": []
+  },
+  {
+    "port": 5985,
+    "protocol": "tcp",
+    "service": "winrm",
+    "risk": "high",
+    "banner_first": false,
+    "probe": "HEAD / HTTP/1.0\r\n\r\n",
+    "match": [
+      "^HTTP"
+    ],
+    "advice": "WinRM over HTTP is a remote shell for attackers once credentials leak. Require HTTPS and firewall it.",
+    "kev_hints": []
+  },
+  {
+    "port": 6379,
+    "protocol": "tcp",
+    "service": "redis",
+    "risk": "critical",
+    "banner_first": false,
+    "probe": "PING\r\n",
+    "match": [
+      "^\\+PONG",
+      "^-ERR",
+      "^\\$\\d"
+    ],
+    "advice": "Unauthenticated Redis is a root-install path (cron and SSH key writes). Require auth, bind to localhost, and keep patched.",
+    "kev_hints": [
+      "redis"
+    ]
+  },
+  {
+    "port": 8000,
+    "protocol": "tcp",
+    "service": "http-alt",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": "HEAD / HTTP/1.0\r\n\r\n",
+    "match": [
+      "^HTTP"
+    ],
+    "advice": "Dev and alt HTTP ports often expose admin panels and debug endpoints. Verify what listens here.",
+    "kev_hints": []
+  },
+  {
+    "port": 8080,
+    "protocol": "tcp",
+    "service": "http-proxy",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": "HEAD / HTTP/1.0\r\n\r\n",
+    "match": [
+      "^HTTP",
+      "Server:\\s*([^\\r\\n]+)"
+    ],
+    "advice": "Alt HTTP ports often expose admin panels, proxies, and debug endpoints. Verify what listens here.",
+    "kev_hints": []
+  },
+  {
+    "port": 8443,
+    "protocol": "tcp",
+    "service": "https-alt",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Alt HTTPS ports often expose admin panels and management consoles. Verify what listens here.",
+    "kev_hints": []
+  },
+  {
+    "port": 9200,
+    "protocol": "tcp",
+    "service": "elasticsearch",
+    "risk": "high",
+    "banner_first": false,
+    "probe": "HEAD / HTTP/1.0\r\n\r\n",
+    "match": [
+      "^HTTP"
+    ],
+    "advice": "Exposed Elasticsearch clusters get indexed and ransomed. Bind to localhost and require auth.",
+    "kev_hints": [
+      "elasticsearch"
+    ]
+  },
+  {
+    "port": 11211,
+    "protocol": "tcp",
+    "service": "memcached",
+    "risk": "medium",
+    "banner_first": false,
+    "probe": "version\r\n",
+    "match": [
+      "^VERSION "
+    ],
+    "advice": "Exposed memcached is the reflection-amplification DDoS record holder (5 Tbps, 2018). Bind to localhost.",
+    "kev_hints": [
+      "memcached"
+    ]
+  },
+  {
+    "port": 27017,
+    "protocol": "tcp",
+    "service": "mongod",
+    "risk": "critical",
+    "banner_first": false,
+    "probe": null,
+    "match": [],
+    "advice": "Unauthenticated MongoDB triggered the 2017 ransomware wave. Require auth, bind to localhost.",
+    "kev_hints": [
+      "mongodb"
+    ]
+  }
+]
