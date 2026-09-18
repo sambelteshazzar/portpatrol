@@ -77,7 +77,7 @@ Each knowledge base entry carries regex `match` patterns in the style of nmap's 
   "risk": "info",
   "banner_first": true,
   "probe": null,
-  "match": ["^SSH-([\\d.]+)-(OpenSSH_([\\d.p]+)|.*)"],
+  "match": ["^SSH-[\\d.]+-(OpenSSH[\\w.p\\-]+)"],
   "advice": "SSH is safe when keyed and patched. Disable password auth, disable root login, keep OpenSSH current.",
   "kev_hints": ["openssh"]
 }
