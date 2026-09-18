@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from portpatrol import knowledge
 from portpatrol.defaults import DEFAULT_ENTRIES, TOP_PORTS
 
@@ -48,3 +50,53 @@ def test_service_index_maps_names_to_entries():
     kb = knowledge.load_knowledge_base()
     idx = knowledge.service_index(kb)
     assert idx["ssh"]["port"] == 22
+
+
+def test_parse_port_spec_list():
+    assert knowledge.parse_port_spec("80,443", TOP_PORTS) == [80, 443]
+
+
+def test_parse_port_spec_range():
+    assert knowledge.parse_port_spec("8000-8003", TOP_PORTS) == [8000, 8001, 8002, 8003]
+
+
+def test_parse_port_spec_mixed_dedup_sorted():
+    assert knowledge.parse_port_spec("443,80,8000-8001,80", TOP_PORTS) == [80, 443, 8000, 8001]
+
+
+def test_parse_port_spec_top50():
+    assert knowledge.parse_port_spec("top50", TOP_PORTS) == TOP_PORTS[:50]
+
+
+def test_parse_port_spec_top1000_covers_well_known():
+    ports = knowledge.parse_port_spec("top1000", TOP_PORTS)
+    for known in (22, 6379, 27017):
+        assert known in ports
+    assert max(ports) >= 27017
+
+
+def test_parse_port_spec_all_length():
+    assert len(knowledge.parse_port_spec("all", TOP_PORTS)) == 65535
+
+
+def test_parse_port_spec_invalid():
+    with pytest.raises(ValueError):
+        knowledge.parse_port_spec("0", TOP_PORTS)
+    with pytest.raises(ValueError):
+        knowledge.parse_port_spec("80-", TOP_PORTS)
+
+
+def test_classify_port_by_port_entry():
+    kb = knowledge.load_knowledge_base()
+    assert knowledge.classify_port(kb, 23) == "critical"
+    assert knowledge.classify_port(kb, 22) == "info"
+
+
+def test_classify_port_by_service_match():
+    kb = knowledge.load_knowledge_base()
+    assert knowledge.classify_port(kb, 12345, service="redis") == "critical"
+
+
+def test_classify_port_unknown():
+    kb = knowledge.load_knowledge_base()
+    assert knowledge.classify_port(kb, 40000, service="notaservice") == "unknown"

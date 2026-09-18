@@ -48,3 +48,51 @@ def get_entry(kb, port):
 def service_index(kb):
     """Map service name to entry for banner-derived classification."""
     return {e["service"]: e for e in kb.values() if e.get("service")}
+
+
+def parse_port_spec(spec, top_ports):
+    """Parse a port specification into a sorted, deduplicated port list.
+
+    Accepts: "top50", "top100", "top1000" (well-known range 1-1023 plus the
+    top-100 list), "all" (1-65535), and explicit specs like "80,443" or
+    "8000-8100". Raises ValueError on anything invalid.
+    """
+    spec = spec.strip().lower()
+    if spec == "all":
+        return list(range(1, 65536))
+    if spec in ("top50", "top100"):
+        return list(top_ports[: 50 if spec == "top50" else 100])
+    if spec == "top1000":
+        return sorted(set(range(1, 1024)) | set(top_ports[:100]))
+    ports = set()
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            raise ValueError(f"invalid port spec: {spec!r}")
+        if "-" in part:
+            lo, _, hi = part.partition("-")
+            lo, hi = int(lo), int(hi)
+            if not (1 <= lo <= hi <= 65535):
+                raise ValueError(f"invalid port range: {part!r}")
+            ports.update(range(lo, hi + 1))
+        else:
+            port = int(part)
+            if not (1 <= port <= 65535):
+                raise ValueError(f"invalid port: {part!r}")
+            ports.add(port)
+    return sorted(ports)
+
+
+def classify_port(kb, port, service=None):
+    """Return the risk level for a port.
+
+    A port entry wins, then a banner-derived service match, else "unknown".
+    """
+    entry = kb.get(port)
+    if entry is not None:
+        return entry["risk"]
+    if service:
+        matched = service_index(kb).get(service)
+        if matched is not None:
+            return matched["risk"]
+    return "unknown"
