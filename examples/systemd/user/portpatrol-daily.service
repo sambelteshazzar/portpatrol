@@ -1,0 +1,12 @@
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp portpatrol-daily.* ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now portpatrol-daily.timer
+
+[Unit]
+Description=PortPatrol daily open-port scan
+
+[Service]
+Type=oneshot
+ExecStart=%h/portpatrol/bin/portpatrol scan --ports top1000 --kev --diff
+SuccessExitStatus=1
