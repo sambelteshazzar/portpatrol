@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections import namedtuple
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from portpatrol.report import append_history, console_table, to_json
 HISTORY_PATH = Path.home() / ".portpatrol" / "history.json"
 STATE_PATH = Path.home() / ".portpatrol" / "state.json"
 ALLOWLIST_PATH = Path.home() / ".portpatrol" / "allowlist.json"
+
+ScanOutcome = namedtuple("ScanOutcome", ("exit_code", "result", "changes", "baseline"))
 
 
 def build_parser():
@@ -41,12 +44,13 @@ def build_parser():
     return parser
 
 
-def cmd_scan(args):
+def run_scan(args):
+    """Run one full scan pipeline. No table/JSON print, no notify, no history."""
     try:
         ports = knowledge.parse_port_spec(args.ports, TOP_PORTS)
     except ValueError as exc:
         print(f"portpatrol: {exc}", file=sys.stderr)
-        return 2
+        return ScanOutcome(2, None, None, False)
 
     kb = knowledge.load_knowledge_base()
     svc_index = knowledge.service_index(kb)
@@ -105,19 +109,27 @@ def cmd_scan(args):
     if args.diff:
         result["changes"] = changes
         result["baseline"] = baseline
+    return ScanOutcome(1 if findings else 0, result, changes, baseline)
+
+
+def cmd_scan(args):
+    outcome = run_scan(args)
+    if outcome.result is None:
+        return outcome.exit_code
+    findings = outcome.result["open"]
 
     if args.json:
-        print(to_json(result))
+        print(to_json(outcome.result))
     else:
         print(console_table(findings))
 
     if not args.no_notify:
         if args.diff:
-            if baseline:
+            if outcome.baseline:
                 notify("PortPatrol", summary_message(findings))
-            elif diff.has_changes(changes):
-                notify("PortPatrol", diff.changes_message(changes))
-                for f in changes["new"]:
+            elif diff.has_changes(outcome.changes):
+                notify("PortPatrol", diff.changes_message(outcome.changes))
+                for f in outcome.changes["new"]:
                     if f["risk"] != "critical":
                         continue
                     detail = f.get("service") or "unknown service"
@@ -138,8 +150,8 @@ def cmd_scan(args):
                     f"Critical: open and exploitable{suffix}. Run 'portpatrol explain {f['port']}'.",
                 )
 
-    append_history(result, HISTORY_PATH)
-    return 1 if findings else 0
+    append_history(outcome.result, HISTORY_PATH)
+    return outcome.exit_code
 
 
 def cmd_explain(args):

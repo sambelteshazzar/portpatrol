@@ -188,3 +188,30 @@ def test_findings_json_include_exposure_fields(monkeypatch, tmp_path, capsys):
     assert f["pid"] == 1
     assert f["process"] == "sshd"
     assert f["risk"] == "info"
+
+
+def test_run_scan_returns_outcome_without_side_effects(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    monkeypatch.setattr(cli, "ALLOWLIST_PATH", tmp_path / "allowlist.json")
+    args = cli.build_parser().parse_args(["scan", "--diff", "--ports", "22"])
+    out = cli.run_scan(args)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert out.exit_code == 1
+    assert out.result["open"][0]["port"] == 22
+    assert out.changes is not None
+    assert out.baseline is True
+    assert (tmp_path / "state.json").exists()
+    assert not (tmp_path / "history.json").exists()
+
+
+def test_run_scan_invalid_ports_returns_error_outcome(capsys):
+    args = cli.build_parser().parse_args(["scan", "--ports", "0"])
+    out = cli.run_scan(args)
+    captured = capsys.readouterr()
+    assert out.exit_code == 2
+    assert out.result is None
+    assert out.changes is None
+    assert out.baseline is False
+    assert "portpatrol:" in captured.err
+    assert captured.out == ""
