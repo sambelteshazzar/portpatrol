@@ -133,3 +133,26 @@ def test_identify_unknown_when_nothing_matches():
     finally:
         srv.close()
     t.join(timeout=2)
+
+
+from unittest import mock
+
+
+def test_enrich_with_nmap_parses_xml():
+    with mock.patch("portpatrol.scanner.shutil.which", return_value="/usr/bin/nmap"), \
+         mock.patch("portpatrol.scanner.subprocess.run") as run:
+        run.return_value = mock.Mock(returncode=0, stdout=scanner.NMAP_XML_SAMPLE)
+        services = scanner.enrich_with_nmap([22, 6379])
+    assert services[22]["service"] == "ssh"
+    assert services[22]["product"] == "OpenSSH"
+    assert services[6379]["version"] == "7.2.4"
+
+
+def test_enrich_with_nmap_skips_when_missing():
+    with mock.patch("portpatrol.scanner.shutil.which", return_value=None):
+        assert scanner.enrich_with_nmap([22]) == {}
+
+
+def test_enrich_with_nmap_empty_without_open_ports():
+    with mock.patch("portpatrol.scanner.shutil.which", return_value="/usr/bin/nmap"):
+        assert scanner.enrich_with_nmap([]) == {}

@@ -118,3 +118,43 @@ def identify(port, entry, svc_index, target="127.0.0.1", timeout=1.0):
                 return {"port": port, "service": matched["service"], "version": matched["version"]}
 
     return {"port": port, "service": "unknown", "version": None}
+
+
+NMAP_XML_SAMPLE = """<?xml version="1.0"?>
+<nmaprun>
+<host><ports>
+<port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH" version="9.6p1"/></port>
+<port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis" version="7.2.4"/></port>
+</ports></host>
+</nmaprun>
+"""
+
+
+def enrich_with_nmap(open_ports, target="127.0.0.1"):
+    """Run nmap -sV on the open ports and parse its XML output.
+
+    Returns {port: {"service": ..., "product": ..., "version": ...}}. Empty
+    dict when nmap is not installed, no ports are open, or the scan fails.
+    """
+    if not open_ports or shutil.which("nmap") is None:
+        return {}
+    port_spec = ",".join(str(p) for p in open_ports)
+    cmd = ["nmap", "-sV", "--version-light", "-p", port_spec, "-oX", "-", target]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if proc.returncode != 0:
+            return {}
+        root = ET.fromstring(proc.stdout)
+    except (OSError, subprocess.TimeoutExpired, ET.ParseError):
+        return {}
+    services = {}
+    for port_el in root.iter("port"):
+        svc = port_el.find("service")
+        if svc is None:
+            continue
+        services[int(port_el.get("portid"))] = {
+            "service": svc.get("name"),
+            "product": svc.get("product"),
+            "version": svc.get("version"),
+        }
+    return services
