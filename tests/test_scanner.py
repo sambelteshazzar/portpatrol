@@ -156,3 +156,50 @@ def test_enrich_with_nmap_skips_when_missing():
 def test_enrich_with_nmap_empty_without_open_ports():
     with mock.patch("portpatrol.scanner.shutil.which", return_value="/usr/bin/nmap"):
         assert scanner.enrich_with_nmap([]) == {}
+
+
+import json
+import time
+
+
+KEV_FIXTURE = {
+    "_fetched_at": time.time(),
+    "vulnerabilities": [
+        {"cve": "CVE-2017-0145", "vendorProject": "Microsoft",
+         "product": "Windows SMB", "description": "Windows SMB Remote Code Execution Vulnerability, known as EternalBlue or ms17-010."},
+        {"cve": "CVE-2021-44228", "vendorProject": "Apache",
+         "product": "Log4j2", "description": "Apache Log4j2 remote code execution."},
+    ],
+}
+
+
+def test_enrich_with_kev_matches_hints(tmp_path):
+    cache = tmp_path / "kev.json"
+    cache.write_text(json.dumps(KEV_FIXTURE), encoding="utf-8")
+    kb = {445: {"port": 445, "kev_hints": ["ms17-010", "smb"]}}
+    findings = [{"port": 445, "service": "microsoft-ds", "product": None}]
+    result = scanner.enrich_with_kev(findings, kb, cache)
+    assert result[0]["cves"] == ["CVE-2017-0145"]
+
+
+def test_enrich_with_kev_no_match_gives_empty_cves(tmp_path):
+    cache = tmp_path / "kev.json"
+    cache.write_text(json.dumps(KEV_FIXTURE), encoding="utf-8")
+    kb = {}
+    findings = [{"port": 40000, "service": "unknown", "product": None}]
+    result = scanner.enrich_with_kev(findings, kb, cache)
+    assert result[0]["cves"] == []
+
+
+def test_fetch_kev_uses_cache(tmp_path):
+    cache = tmp_path / "kev.json"
+    cache.write_text(json.dumps(KEV_FIXTURE), encoding="utf-8")
+    with mock.patch("portpatrol.scanner.urllib.request.urlopen") as urlopen:
+        records = scanner.fetch_kev(cache)
+    urlopen.assert_not_called()
+    assert len(records) == 2
+
+
+def test_fetch_kev_skips_offline_without_cache(tmp_path):
+    with mock.patch("portpatrol.scanner.urllib.request.urlopen", side_effect=OSError):
+        assert scanner.fetch_kev(tmp_path / "kev.json") == []

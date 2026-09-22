@@ -158,3 +158,71 @@ def enrich_with_nmap(open_ports, target="127.0.0.1"):
             "version": svc.get("version"),
         }
     return services
+
+
+KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+KEV_MAX_AGE = 24 * 3600
+
+
+def _load_kev_cache(cache_path):
+    try:
+        data = json.loads(Path(cache_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or "_fetched_at" not in data:
+        return None
+    if time.time() - data["_fetched_at"] > KEV_MAX_AGE:
+        return None
+    return data.get("vulnerabilities", [])
+
+
+def fetch_kev(cache_path, url=KEV_URL):
+    """Return KEV vulnerability records, cached for 24 hours at cache_path.
+
+    Returns [] when the fetch fails and no fresh cache exists.
+    """
+    cached = _load_kev_cache(cache_path)
+    if cached is not None:
+        return cached
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (OSError, ValueError):
+        return []
+    records = data.get("vulnerabilities", [])
+    payload = {"_fetched_at": time.time(), "vulnerabilities": records}
+    try:
+        cache_path = Path(cache_path)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps(payload), encoding="utf-8")
+    except OSError:
+        pass
+    return records
+
+
+def enrich_with_kev(findings, kb, cache_path):
+    """Add "cves" to each finding using kev_hints and product names.
+
+    Matches the entry's kev_hints keywords and the nmap-derived product name
+    against the feed's vendorProject, product, and description fields.
+    Mutates and returns findings.
+    """
+    records = fetch_kev(cache_path)
+    hints_by_port = {}
+    for f in findings:
+        hints = set()
+        entry = kb.get(f["port"])
+        if entry:
+            hints.update(h.lower() for h in entry.get("kev_hints", []))
+        if f.get("product"):
+            hints.add(f["product"].lower())
+        hints_by_port[f["port"]] = hints
+    for f in findings:
+        cves = set()
+        for rec in records:
+            blob = (f"{rec.get('vendorProject', '')} {rec.get('product', '')} "
+                    f"{rec.get('description', '')}").lower()
+            if any(h in blob for h in hints_by_port[f["port"]]):
+                cves.add(rec.get("cve"))
+        f["cves"] = sorted(c for c in cves if c)
+    return findings
