@@ -41,3 +41,80 @@ def sweep(ports, target="127.0.0.1", timeout=0.5, workers=100):
                 open_ports.append(futures[future])
                 sock.close()
     return sorted(open_ports)
+
+
+def grab_banner(port, target="127.0.0.1", timeout=1.0, recv_bytes=256):
+    """Connect and read the first bytes a service sends. b"" when silent, None on failure."""
+    sock = _connect(target, port, timeout)
+    if sock is None:
+        return None
+    try:
+        return sock.recv(recv_bytes)
+    except OSError:
+        return None
+    finally:
+        sock.close()
+
+
+def send_probe(port, probe, target="127.0.0.1", timeout=1.0, recv_bytes=256):
+    """Connect, send a probe, read the response. None on any failure."""
+    sock = _connect(target, port, timeout)
+    if sock is None:
+        return None
+    try:
+        sock.sendall(probe)
+        return sock.recv(recv_bytes)
+    except OSError:
+        return None
+    finally:
+        sock.close()
+
+
+def _match_response(service, patterns, response):
+    """Apply match patterns to response bytes.
+
+    Returns {"service": str | None, "version": str | None}. The service is
+    named when any pattern matches; the first capturing group of the first
+    group-matching pattern becomes the version.
+    """
+    text = response.decode("latin-1", errors="replace")
+    out = {"service": None, "version": None}
+    for pattern in patterns:
+        m = re.search(pattern, text)
+        if m is None:
+            continue
+        if out["service"] is None:
+            out["service"] = service
+        if m.groups() and m.group(1):
+            out["version"] = m.group(1)
+            break
+    return out
+
+
+def identify(port, entry, svc_index, target="127.0.0.1", timeout=1.0):
+    """Identify the service on an open port.
+
+    Uses the entry's probe/match rules when present. Falls back to a banner
+    grab matched against the knowledge base service index. Returns
+    {"port": int, "service": str, "version": str | None} with service
+    "unknown" when nothing matches.
+    """
+    if entry is not None:
+        response = None
+        if entry.get("probe"):
+            response = send_probe(port, entry["probe"].encode("latin-1"), target, timeout)
+        elif entry.get("banner_first"):
+            response = grab_banner(port, target, timeout)
+        if response:
+            matched = _match_response(entry["service"], entry.get("match", []), response)
+            if matched["service"] is not None:
+                return {"port": port, "service": matched["service"], "version": matched["version"]}
+
+    banner = grab_banner(port, target, timeout)
+    if banner:
+        for name, candidate in svc_index.items():
+            matched = _match_response(name, candidate.get("match", []), banner)
+            if matched["service"] is not None:
+                return {"port": port, "service": matched["service"], "version": matched["version"]}
+
+    return {"port": port, "service": "unknown", "version": None}
