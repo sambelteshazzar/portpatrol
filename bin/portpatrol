@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# PortPatrol launcher: runs the CLI from a source checkout or an installed package.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_PARENT="$(dirname "$SCRIPT_DIR")"
+
+export PYTHONPATH="${PACKAGE_PARENT}${PYTHONPATH:+:$PYTHONPATH}"
+
+exec python3 -m portpatrol "$@"
