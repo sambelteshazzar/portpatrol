@@ -56,3 +56,84 @@ def test_main_explain_unknown_port(capsys):
     assert cli.main(["explain", "40000"]) == 0
     out = capsys.readouterr().out
     assert "unknown" in out
+
+
+def test_diff_flag_exists():
+    args = cli.build_parser().parse_args(["scan", "--diff"])
+    assert args.diff is True
+    args = cli.build_parser().parse_args(["scan"])
+    assert args.diff is False
+
+
+def _patch_scan(monkeypatch, tmp_path, open_ports, identify_service="ssh"):
+    monkeypatch.setattr(cli, "HISTORY_PATH", tmp_path / "history.json")
+    monkeypatch.setattr(cli, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr("portpatrol.scanner.sweep", lambda ports, **kw: open_ports)
+    monkeypatch.setattr("portpatrol.scanner.identify",
+                        lambda p, e, i, **kw: {"port": p, "service": identify_service,
+                                               "version": None})
+    monkeypatch.setattr("portpatrol.scanner.enrich_with_nmap", lambda ports, **kw: {})
+
+
+def test_diff_first_run_establishes_baseline(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [])
+    calls = []
+    monkeypatch.setattr(cli, "notify", lambda t, b: calls.append((t, b)) or True)
+    assert cli.main(["scan", "--diff", "--ports", "80"]) == 0
+    assert len(calls) == 1
+    assert "all clear" in calls[0][1]
+    assert (tmp_path / "state.json").exists()
+
+
+def test_diff_unchanged_second_run_is_silent(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    import json as _json
+    (tmp_path / "state.json").write_text(_json.dumps(
+        {"version": 1, "open": [{"port": 22, "service": "ssh", "version": None, "risk": "info"}]}
+    ), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(cli, "notify", lambda t, b: calls.append((t, b)) or True)
+    assert cli.main(["scan", "--diff", "--ports", "22"]) == 1
+    assert calls == []
+
+
+def test_diff_new_port_toasts_changes(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [8080], identify_service="http-proxy")
+    import json as _json
+    (tmp_path / "state.json").write_text(
+        _json.dumps({"version": 1, "open": []}), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(cli, "notify", lambda t, b: calls.append((t, b)) or True)
+    assert cli.main(["scan", "--diff", "--ports", "8080"]) == 1
+    assert len(calls) == 1
+    assert calls[0][1].startswith("🆕")
+    assert "8080" in calls[0][1]
+
+
+def test_diff_json_includes_changes(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    import json as _json
+    (tmp_path / "state.json").write_text(
+        _json.dumps({"version": 1, "open": []}), encoding="utf-8")
+    cli.main(["scan", "--diff", "--json", "--no-notify", "--ports", "22"])
+    out = _json.loads(capsys.readouterr().out)
+    assert out["baseline"] is False
+    assert [f["port"] for f in out["changes"]["new"]] == [22]
+
+
+def test_non_diff_runs_do_not_touch_state(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [])
+    cli.main(["scan", "--no-notify", "--ports", "80"])
+    assert not (tmp_path / "state.json").exists()
+
+
+def test_diff_new_critical_gets_detail_toast(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [6379], identify_service="redis")
+    import json as _json
+    (tmp_path / "state.json").write_text(
+        _json.dumps({"version": 1, "open": []}), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(cli, "notify", lambda t, b: calls.append((t, b)) or True)
+    cli.main(["scan", "--diff", "--ports", "6379"])
+    assert calls[0][1].startswith("🚨")
+    assert calls[1][0].startswith("🚨 Port 6379")

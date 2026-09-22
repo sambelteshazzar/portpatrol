@@ -7,12 +7,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from portpatrol import knowledge, scanner
+from portpatrol import diff, knowledge, scanner
 from portpatrol.defaults import TOP_PORTS
 from portpatrol.notifier import notify, summary_message
 from portpatrol.report import append_history, console_table, to_json
 
 HISTORY_PATH = Path.home() / ".portpatrol" / "history.json"
+STATE_PATH = Path.home() / ".portpatrol" / "state.json"
+ALLOWLIST_PATH = Path.home() / ".portpatrol" / "allowlist.json"
 
 
 def build_parser():
@@ -29,6 +31,8 @@ def build_parser():
     scan.add_argument("--kev", action="store_true", help="cross-reference CISA KEV catalog")
     scan.add_argument("--no-notify", action="store_true", help="suppress desktop notifications")
     scan.add_argument("--verbose", action="store_true", help="log skipped enrichments and probe failures")
+    scan.add_argument("--diff", action="store_true",
+                      help="compare with the last scan; alert only on changes")
     scan.set_defaults(func=cmd_scan)
 
     explain = sub.add_parser("explain", help="print the knowledge base entry for a port")
@@ -73,12 +77,25 @@ def cmd_scan(args):
     if args.kev:
         scanner.enrich_with_kev(findings, kb, Path.home() / ".portpatrol" / "kev.json")
 
+    changes = None
+    baseline = False
+    if args.diff:
+        prev_state = diff.load_state(STATE_PATH)
+        baseline = prev_state is None
+        allow = diff.load_allowlist(ALLOWLIST_PATH)
+        changes = diff.compute_changes(
+            [] if prev_state is None else prev_state["open"], findings, allow)
+        diff.save_state(STATE_PATH, findings)
+
     result = {
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "target": "127.0.0.1",
         "scanned": len(ports),
         "open": findings,
     }
+    if args.diff:
+        result["changes"] = changes
+        result["baseline"] = baseline
 
     if args.json:
         print(to_json(result))
@@ -86,17 +103,31 @@ def cmd_scan(args):
         print(console_table(findings))
 
     if not args.no_notify:
-        notify("PortPatrol", summary_message(findings))
-        for f in findings:
-            if f["risk"] != "critical":
-                continue
-            detail = f.get("service") or "unknown service"
-            cves = ", ".join(f.get("cves", []))
-            suffix = f" ({cves})" if cves else ""
-            notify(
-                f"🚨 Port {f['port']} {detail}",
-                f"Critical: open and exploitable{suffix}. Run 'portpatrol explain {f['port']}'.",
-            )
+        if args.diff:
+            if baseline:
+                notify("PortPatrol", summary_message(findings))
+            elif diff.has_changes(changes):
+                notify("PortPatrol", diff.changes_message(changes))
+                for f in changes["new"]:
+                    if f["risk"] != "critical":
+                        continue
+                    detail = f.get("service") or "unknown service"
+                    notify(
+                        f"🚨 Port {f['port']} {detail}",
+                        f"Critical: newly open. Run 'portpatrol explain {f['port']}'.",
+                    )
+        else:
+            notify("PortPatrol", summary_message(findings))
+            for f in findings:
+                if f["risk"] != "critical":
+                    continue
+                detail = f.get("service") or "unknown service"
+                cves = ", ".join(f.get("cves", []))
+                suffix = f" ({cves})" if cves else ""
+                notify(
+                    f"🚨 Port {f['port']} {detail}",
+                    f"Critical: open and exploitable{suffix}. Run 'portpatrol explain {f['port']}'.",
+                )
 
     append_history(result, HISTORY_PATH)
     return 1 if findings else 0
