@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from collections import namedtuple
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +38,19 @@ def build_parser():
     scan.add_argument("--diff", action="store_true",
                       help="compare with the last scan; alert only on changes")
     scan.set_defaults(func=cmd_scan)
+
+    watch = sub.add_parser("watch", help="continuously scan and alert only on changes")
+    watch.add_argument("--interval", type=int, default=60,
+                       help="seconds between scans (default 60, min 1)")
+    watch.add_argument("--ports", default="top1000",
+                       help="top50 | top100 | top1000 | all | 80,443 | 8000-8100")
+    watch.add_argument("--kev", action="store_true",
+                       help="cross-reference CISA KEV catalog")
+    watch.add_argument("--no-notify", action="store_true",
+                       help="suppress desktop notifications")
+    watch.add_argument("--verbose", action="store_true",
+                       help="log one status line per cycle to stderr")
+    watch.set_defaults(func=cmd_watch)
 
     explain = sub.add_parser("explain", help="print the knowledge base entry for a port")
     explain.add_argument("port", type=int)
@@ -152,6 +166,57 @@ def cmd_scan(args):
 
     append_history(outcome.result, HISTORY_PATH)
     return outcome.exit_code
+
+
+def cmd_watch(args):
+    if args.interval < 1:
+        print("portpatrol: --interval must be >= 1", file=sys.stderr)
+        return 2
+    try:
+        knowledge.parse_port_spec(args.ports, TOP_PORTS)
+    except ValueError as exc:
+        print(f"portpatrol: {exc}", file=sys.stderr)
+        return 2
+
+    args.diff = True
+    cycle = 0
+    try:
+        while True:
+            cycle += 1
+            try:
+                outcome = run_scan(args)
+            except Exception as exc:
+                print(f"portpatrol: {exc}", file=sys.stderr)
+                return 2
+            if outcome.result is None:
+                return outcome.exit_code
+            if outcome.baseline:
+                if not args.no_notify:
+                    notify("PortPatrol", summary_message(outcome.result["open"]))
+            elif outcome.changes and diff.has_changes(outcome.changes):
+                msg = diff.changes_message(outcome.changes)
+                print(msg)
+                if not args.no_notify:
+                    notify("PortPatrol", msg)
+                    for f in outcome.changes["new"]:
+                        if f["risk"] != "critical":
+                            continue
+                        detail = f.get("service") or "unknown service"
+                        notify(
+                            f"🚨 Port {f['port']} {detail}",
+                            f"Critical: newly open. Run 'portpatrol explain {f['port']}'.",
+                        )
+                append_history(outcome.result, HISTORY_PATH)
+            if args.verbose:
+                n_ch = (len(outcome.changes["new"])
+                        + len(outcome.changes["removed"])
+                        + len(outcome.changes["changed"])) if outcome.changes else 0
+                print(f"portpatrol: cycle {cycle} "
+                      f"open={len(outcome.result['open'])} changes={n_ch}",
+                      file=sys.stderr)
+            time.sleep(args.interval)
+    except KeyboardInterrupt:
+        return 0
 
 
 def cmd_explain(args):
