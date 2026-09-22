@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import socket
+from types import SimpleNamespace
 
 import pytest
 
@@ -229,7 +230,7 @@ def test_watch_parser_defaults():
 
 def test_watch_rejects_bad_interval(monkeypatch):
     slept = []
-    monkeypatch.setattr(cli.time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=lambda s: slept.append(s)))
     assert cli.main(["watch", "--interval", "0"]) == 2
     assert cli.main(["watch", "--interval", "-1"]) == 2
     assert slept == []
@@ -243,7 +244,7 @@ def test_watch_rejects_non_integer_interval():
 
 def test_watch_rejects_bad_ports_before_loop(monkeypatch, capsys):
     slept = []
-    monkeypatch.setattr(cli.time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=lambda s: slept.append(s)))
     assert cli.main(["watch", "--ports", "0"]) == 2
     assert "portpatrol:" in capsys.readouterr().err
     assert slept == []
@@ -265,7 +266,7 @@ def test_watch_quiet_cycles_stay_silent(monkeypatch, tmp_path, capsys):
         if cycles["n"] >= 2:
             raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli.time, "sleep", fake_sleep)
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=fake_sleep))
     assert cli.main(["watch", "--interval", "1", "--ports", "22"]) == 0
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -284,7 +285,7 @@ def test_watch_change_cycle_prints_toasts_and_history(monkeypatch, tmp_path, cap
     def fake_sleep(interval):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli.time, "sleep", fake_sleep)
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=fake_sleep))
     assert cli.main(["watch", "--interval", "1", "--ports", "8080"]) == 0
     captured = capsys.readouterr()
     assert captured.out.startswith("🆕")
@@ -305,7 +306,7 @@ def test_watch_baseline_toasts_all_clear_without_history(monkeypatch, tmp_path, 
     def fake_sleep(interval):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli.time, "sleep", fake_sleep)
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=fake_sleep))
     assert cli.main(["watch", "--interval", "1", "--ports", "80"]) == 0
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -326,7 +327,7 @@ def test_watch_new_critical_gets_detail_toast(monkeypatch, tmp_path):
     def fake_sleep(interval):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli.time, "sleep", fake_sleep)
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=fake_sleep))
     cli.main(["watch", "--interval", "1", "--ports", "6379"])
     assert calls[0][1].startswith("🚨")
     assert calls[1][0].startswith("🚨 Port 6379")
@@ -344,7 +345,7 @@ def test_watch_verbose_logs_cycle_line(monkeypatch, tmp_path, capsys):
     def fake_sleep(interval):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli.time, "sleep", fake_sleep)
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=fake_sleep))
     assert cli.main(["watch", "--verbose", "--interval", "1", "--ports", "22"]) == 0
     err = capsys.readouterr().err
     assert "cycle 1" in err
@@ -361,7 +362,7 @@ def test_watch_cycle_error_exits_two(monkeypatch, tmp_path, capsys):
 
     monkeypatch.setattr("portpatrol.scanner.sweep", boom)
     slept = []
-    monkeypatch.setattr(cli.time, "sleep", lambda s: slept.append(s))
+    monkeypatch.setattr(cli, "time", SimpleNamespace(sleep=lambda s: slept.append(s)))
     assert cli.main(["watch", "--ports", "22"]) == 2
     assert "sweep exploded" in capsys.readouterr().err
     assert slept == []
