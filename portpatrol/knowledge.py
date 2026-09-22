@@ -96,3 +96,13 @@ def classify_port(kb, port, service=None):
         if matched is not None:
             return matched["risk"]
     return "unknown"
+
+
+_LOOPBACK_DOWNGRADE = {"critical": "high", "high": "medium", "medium": "info"}
+
+
+def adjust_risk_for_exposure(risk, exposure):
+    """One-level downgrade for loopback-only listeners; interface/unknown unchanged."""
+    if exposure == "loopback":
+        return _LOOPBACK_DOWNGRADE.get(risk, risk)
+    return risk

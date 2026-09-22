@@ -100,3 +100,17 @@ def test_classify_port_by_service_match():
 def test_classify_port_unknown():
     kb = knowledge.load_knowledge_base()
     assert knowledge.classify_port(kb, 40000, service="notaservice") == "unknown"
+
+
+def test_adjust_risk_loopback_downgrades_one_level():
+    assert knowledge.adjust_risk_for_exposure("critical", "loopback") == "high"
+    assert knowledge.adjust_risk_for_exposure("high", "loopback") == "medium"
+    assert knowledge.adjust_risk_for_exposure("medium", "loopback") == "info"
+    assert knowledge.adjust_risk_for_exposure("info", "loopback") == "info"
+    assert knowledge.adjust_risk_for_exposure("unknown", "loopback") == "unknown"
+
+
+def test_adjust_risk_interface_or_unknown_exposure_unchanged():
+    assert knowledge.adjust_risk_for_exposure("critical", "interface") == "critical"
+    assert knowledge.adjust_risk_for_exposure("medium", "interface") == "medium"
+    assert knowledge.adjust_risk_for_exposure("high", "unknown") == "high"
