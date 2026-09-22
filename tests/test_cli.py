@@ -1,4 +1,9 @@
 import json
+import os
+import shutil
+import socket
+
+import pytest
 
 from portpatrol import cli
 
@@ -137,3 +142,49 @@ def test_diff_new_critical_gets_detail_toast(monkeypatch, tmp_path):
     cli.main(["scan", "--diff", "--ports", "6379"])
     assert calls[0][1].startswith("🚨")
     assert calls[1][0].startswith("🚨 Port 6379")
+
+
+def test_verbose_notes_missing_listener_table(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    monkeypatch.setattr("portpatrol.listeners.collect_listeners", lambda: {})
+    cli.main(["scan", "--no-notify", "--verbose", "--ports", "22"])
+    assert "listener table" in capsys.readouterr().err
+
+
+@pytest.mark.skipif(shutil.which("ss") is None, reason="ss not installed")
+def test_scan_loopback_listener_downgrades_risk_and_attributes_pid(monkeypatch, tmp_path):
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        srv.bind(("127.0.0.1", 6379))
+    except OSError:
+        srv.close()
+        pytest.skip("port 6379 busy")
+    srv.listen(5)
+    try:
+        monkeypatch.setattr(cli, "HISTORY_PATH", tmp_path / "history.json")
+        monkeypatch.setattr("portpatrol.scanner.identify",
+                            lambda p, e, i, **kw: {"port": p, "service": "redis",
+                                                   "version": None})
+        monkeypatch.setattr("portpatrol.scanner.enrich_with_nmap", lambda ports, **kw: {})
+        assert cli.main(["scan", "--no-notify", "--ports", "6379"]) == 1
+        history = json.loads((tmp_path / "history.json").read_text(encoding="utf-8"))
+        f = history[0]["open"][0]
+        assert f["exposure"] == "loopback"
+        assert f["risk"] == "high"
+        assert f["pid"] == os.getpid()
+        assert f["process"]
+    finally:
+        srv.close()
+
+
+def test_findings_json_include_exposure_fields(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    monkeypatch.setattr("portpatrol.listeners.collect_listeners",
+                        lambda: {22: {"pid": 1, "process": "sshd", "bind": "0.0.0.0"}})
+    cli.main(["scan", "--no-notify", "--json", "--ports", "22"])
+    out = json.loads(capsys.readouterr().out)
+    f = out["open"][0]
+    assert f["exposure"] == "interface"
+    assert f["pid"] == 1
+    assert f["process"] == "sshd"
+    assert f["risk"] == "info"

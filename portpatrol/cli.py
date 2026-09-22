@@ -7,7 +7,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from portpatrol import diff, knowledge, scanner
+from portpatrol import diff, knowledge, listeners, scanner
 from portpatrol.defaults import TOP_PORTS
 from portpatrol.notifier import notify, summary_message
 from portpatrol.report import append_history, console_table, to_json
@@ -69,9 +69,18 @@ def cmd_scan(args):
         if extra.get("product"):
             f["product"] = extra["product"]
 
+    inv = listeners.collect_listeners()
+    if args.verbose and findings and not inv:
+        print("portpatrol: listener table unavailable (ss/netstat); "
+              "no process attribution", file=sys.stderr)
     for f in findings:
+        info = inv.get(f["port"]) or {}
+        f["pid"] = info.get("pid")
+        f["process"] = info.get("process")
+        f["exposure"] = listeners.classify_exposure(info.get("bind"))
         service = f["service"] if f["service"] not in (None, "unknown") else None
-        f["risk"] = knowledge.classify_port(kb, f["port"], service)
+        risk = knowledge.classify_port(kb, f["port"], service)
+        f["risk"] = knowledge.adjust_risk_for_exposure(risk, f["exposure"])
         f["cves"] = []
 
     if args.kev:

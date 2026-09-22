@@ -30,3 +30,11 @@ def test_append_history_creates_and_appends(tmp_path):
     report.append_history({"timestamp": "t2", "open": []}, path)
     history = json.loads(path.read_text(encoding="utf-8"))
     assert [h["timestamp"] for h in history] == ["t1", "t2"]
+
+
+def test_console_table_shows_exposure_and_process():
+    findings = [{"port": 6379, "risk": "high", "service": "redis", "version": None,
+                 "cves": [], "exposure": "loopback", "process": "redis-server"}]
+    table = report.console_table(findings)
+    assert "loopback" in table
+    assert "redis-server" in table

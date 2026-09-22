@@ -13,12 +13,16 @@ def console_table(findings):
     if not findings:
         return "✅ No open ports found."
     ordered = sorted(findings, key=lambda f: RISK_ORDER.index(f["risk"]))
-    lines = [f"{'PORT':>6}  {'RISK':<8} {'SERVICE':<16} {'VERSION':<20} CVES"]
+    lines = [f"{'PORT':>6}  {'RISK':<8} {'EXPOSURE':<9} {'SERVICE':<16} "
+             f"{'VERSION':<14} {'PROCESS':<14} CVES"]
     for f in ordered:
         cves = ", ".join(f.get("cves", []))
+        exposure = f.get("exposure") or "-"
+        process = f.get("process") or "-"
         lines.append(
             f"{f['port']:>6}  {EMOJI[f['risk']]} {f['risk']:<7} "
-            f"{f.get('service') or 'unknown':<16} {(f.get('version') or '-'):<20} {cves}"
+            f"{exposure:<9} {f.get('service') or 'unknown':<16} "
+            f"{(f.get('version') or '-'):<14} {process:<14} {cves}"
         )
     return "\n".join(lines)
 
