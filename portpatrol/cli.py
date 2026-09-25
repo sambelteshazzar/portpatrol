@@ -26,7 +26,7 @@ def build_parser():
         prog="portpatrol",
         description="Scan this machine for open ports and classify the risk.",
     )
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
 
     scan = sub.add_parser("scan", help="scan localhost and report open ports")
     scan.add_argument("--ports", default="top1000",
@@ -233,8 +233,21 @@ def cmd_explain(args):
     return 0
 
 
+def apply_bare_defaults(args):
+    """Fill scan defaults when no subcommand was given, so bare runs scan."""
+    if args.command is None:
+        args.func = cmd_scan
+        args.ports = "top1000"
+        args.json = False
+        args.kev = False
+        args.no_notify = False
+        args.verbose = False
+        args.diff = False
+    return args
+
+
 def main(argv=None):
-    args = build_parser().parse_args(argv)
+    args = apply_bare_defaults(build_parser().parse_args(argv))
     try:
         return args.func(args)
     except KeyboardInterrupt:

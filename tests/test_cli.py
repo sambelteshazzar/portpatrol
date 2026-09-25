@@ -397,3 +397,43 @@ def test_watch_cycle_error_exits_two(monkeypatch, tmp_path, capsys):
     assert cli.main(["watch", "--ports", "22"]) == 2
     assert "sweep exploded" in capsys.readouterr().err
     assert slept == []
+
+
+def test_bare_invocation_carries_scan_defaults():
+    args = cli.apply_bare_defaults(cli.build_parser().parse_args([]))
+    assert args.ports == "top1000"
+    assert args.json is False
+    assert args.kev is False
+    assert args.no_notify is False
+    assert args.verbose is False
+    assert args.diff is False
+    assert args.func is cli.cmd_scan
+
+
+def test_bare_invocation_runs_clean_scan(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(cli, "HISTORY_PATH", tmp_path / "history.json")
+    monkeypatch.setattr("portpatrol.scanner.sweep", lambda ports, **kw: [])
+    monkeypatch.setattr(cli, "notify", lambda t, b: True)
+    assert cli.main([]) == 0
+    assert "No open ports" in capsys.readouterr().out
+
+
+def test_bare_invocation_runs_findings_scan(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    monkeypatch.setattr(cli, "notify", lambda t, b: True)
+    assert cli.main([]) == 1
+
+
+def test_help_lists_subcommands(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.build_parser().parse_args(["--help"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    for name in ("scan", "watch", "explain"):
+        assert name in out
+
+
+def test_bare_unknown_flag_exits_two():
+    with pytest.raises(SystemExit) as exc:
+        cli.build_parser().parse_args(["--json"])
+    assert exc.value.code == 2
