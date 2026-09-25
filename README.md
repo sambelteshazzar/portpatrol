@@ -6,6 +6,16 @@ The scan side is plain Python 3.8+ with no third-party packages. A scan opens co
 
 ## Install
 
+Python 3.8 or newer is the only hard requirement. Install `nmap` before the first scan if you can: the scan works without it, but ports the built-in probes do not recognize report `unknown` service and no version. Desktop toasts need `notify-send` on Linux; the [Optional tools](#optional-tools) table lists what each missing tool changes.
+
+Debian or Ubuntu:
+
+```
+sudo apt install nmap libnotify-bin
+```
+
+On Windows, nmap installs from nmap.org and notifications use the built-in PowerShell toast, so no extra package is needed there.
+
 ### Linux
 
 ```
