@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portpatrol"
+version = "0.1.0"
+description = "Scan the local machine for open TCP ports, classify the risk, and alert on changes."
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "sambelteshazzar" }]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Networking :: Monitoring",
+]
+
+[project.scripts]
+portpatrol = "portpatrol.cli:main"
+
+[tool.setuptools]
+packages = ["portpatrol"]
+
+[tool.setuptools.package-data]
+portpatrol = ["knowledge_base.json", "data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
