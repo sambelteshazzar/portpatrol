@@ -76,4 +76,4 @@
 - [x] **Step 1:** `python3 -m pytest` green (122 passed, exit 0, run fresh after all feature commits).
 - [x] **Step 2:** bare `portpatrol` runs a real scan from the repo checkout (`./bin/portpatrol` printed the table, exit 1 for present findings).
 - [x] **Step 3:** scratch-home `install.sh` run works end to end: install exit 0, installed `explain 22` exit 0, installed bare command exit 1 with findings, unknown top-level flag exit 2, absolute `Exec` in the installed desktop file.
-- [ ] **Step 4:** push.
+- [x] **Step 4:** push.
