@@ -61,3 +61,50 @@ def test_wrapper_content():
     assert re.search(r"exit\s+\$?\{?status\}?", text), (
         "wrapper must exit with the scan status"
     )
+
+
+BAT = REPO_ROOT / "portpatrol.bat"
+PS1 = REPO_ROOT / "install.ps1"
+
+
+def meaningful_bat_lines(text):
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.lower().startswith("rem ") or stripped.startswith("::") or stripped.startswith("@rem"):
+            continue
+        lines.append(stripped.lower())
+    return lines
+
+
+def test_bat_prefers_installed_venv_and_pauses():
+    text = BAT.read_text(encoding="utf-8")
+    lower = text.lower()
+    assert "portpatrol\\venv\\scripts\\portpatrol.exe" in lower
+    assert "py -3 -m portpatrol" in lower
+    assert "pythonpath" in lower
+    lines = meaningful_bat_lines(text)
+    pause_index = next(i for i, ln in enumerate(lines) if ln.split()[0] == "pause")
+    exit_index = next(i for i, ln in enumerate(lines) if ln.startswith("exit /b"))
+    assert pause_index < exit_index, "the launcher must pause before exiting"
+    assert lines[-1].startswith("exit /b")
+
+
+def test_ps1_preserves_user_path_and_broadcasts():
+    text = PS1.read_text(encoding="utf-8")
+    lower = text.lower()
+    assert "setx" not in lower, "setx truncates and rewrites the user PATH"
+    assert "GetEnvironmentVariable('Path', 'User')" in text
+    assert "DoNotExpandEnvironmentNames" in text
+    assert "ExpandString" in text
+    assert "SendMessageTimeout" in text
+    assert "ExecutionPolicy Bypass" in text
+
+
+def test_ps1_discovers_python_and_checks_version():
+    text = PS1.read_text(encoding="utf-8")
+    assert "py -3" in text
+    assert "(3, 8)" in text
+    assert "portpatrol install:" in text
