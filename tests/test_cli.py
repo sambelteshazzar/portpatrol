@@ -384,6 +384,19 @@ def test_watch_verbose_logs_cycle_line(monkeypatch, tmp_path, capsys):
     assert "changes=0" in err
 
 
+def test_watch_limits_nmap_enrichment(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    calls = []
+
+    def fake_run_scan(args):
+        calls.append(args.nmap_timeout)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "run_scan", fake_run_scan)
+    assert cli.main(["watch", "--ports", "22"]) == 0
+    assert calls == [2]
+
+
 def test_watch_cycle_error_exits_two(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(cli, "HISTORY_PATH", tmp_path / "history.json")
     monkeypatch.setattr(cli, "STATE_PATH", tmp_path / "state.json")

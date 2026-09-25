@@ -130,7 +130,7 @@ NMAP_XML_SAMPLE = """<?xml version="1.0"?>
 """
 
 
-def enrich_with_nmap(open_ports, target="127.0.0.1"):
+def enrich_with_nmap(open_ports, target="127.0.0.1", timeout=120):
     """Run nmap -sV on the open ports and parse its XML output.
 
     Returns {port: {"service": ..., "product": ..., "version": ...}}. Empty
@@ -141,7 +141,7 @@ def enrich_with_nmap(open_ports, target="127.0.0.1"):
     port_spec = ",".join(str(p) for p in open_ports)
     cmd = ["nmap", "-sV", "--version-light", "-p", port_spec, "-oX", "-", target]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
         if proc.returncode != 0:
             return {}
         root = ET.fromstring(proc.stdout)

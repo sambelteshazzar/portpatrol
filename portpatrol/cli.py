@@ -75,7 +75,7 @@ def run_scan(args):
 
     findings = [scanner.identify(p, knowledge.get_entry(kb, p), svc_index) for p in open_ports]
 
-    services = scanner.enrich_with_nmap(open_ports)
+    services = scanner.enrich_with_nmap(open_ports, timeout=getattr(args, "nmap_timeout", 120))
     if args.verbose and open_ports and not services:
         print("portpatrol: nmap not found; socket probes only", file=sys.stderr)
     for f in findings:
@@ -179,6 +179,7 @@ def cmd_watch(args):
         return 2
 
     args.diff = True
+    args.nmap_timeout = 2
     cycle = 0
     try:
         while True:
