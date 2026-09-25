@@ -37,7 +37,7 @@ Make PortPatrol runnable by people who do not live in a terminal: a bare `portpa
 
 ### 4. Double-click launchers
 
-- Linux: `portpatrol-desktop.sh` wrapper that runs a scan and then waits for Enter so the window does not close on the result. `examples/desktop/portpatrol.desktop` carries `Type=Application`, `Terminal=true`, `Icon=utilities-system-monitor`, and `Exec=` pointing at the wrapper's absolute path. Paths with spaces are quoted per the freedesktop desktop entry spec (double quotes, no field codes inside quotes).
+- Linux: `portpatrol-desktop.sh` wrapper that runs a scan and then waits for Enter so the window does not close on the result. `examples/desktop/portpatrol.desktop` carries `Type=Application`, `Terminal=true`, `Icon=utilities-system-monitor`, and `Exec=portpatrol-desktop.sh` as a bare name (resolved through `PATH`, which the spec allows); `install.sh` rewrites it to the wrapper's absolute path when it copies the file. Paths with spaces are quoted per the freedesktop desktop entry spec (double quotes, no field codes inside quotes).
 - Windows: `portpatrol.bat` runs a scan, then `pause`. Resolution order: installed shim, then `py -3 -m portpatrol` with `PYTHONPATH` set to the checkout, then `python -m portpatrol`.
 - Both files work standalone for people who copy them by hand; the installers place them.
 

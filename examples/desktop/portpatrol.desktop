@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PortPatrol
+Comment=Scan localhost for open ports
+Exec=portpatrol-desktop.sh
+Icon=utilities-system-monitor
+Terminal=true
+Categories=System;Security;
+StartupNotify=false
