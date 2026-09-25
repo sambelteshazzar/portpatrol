@@ -26,7 +26,7 @@ mkdir -p "$HOME/.portpatrol" || fail "cannot create $HOME/.portpatrol."
 
 if ! python3 -m venv "$VENV" 2>"$ERR_FILE"; then
     if grep -qi 'ensurepip' "$ERR_FILE"; then
-        fail "the venv module cannot bootstrap pip. On Debian or Ubuntu run: sudo apt install python3-venv. On Fedora: sudo dnf install python3. On Arch: sudo pacman -S python, then re-run this script."
+        fail "the venv module cannot bootstrap pip. On Debian or Ubuntu run: sudo apt install python3-venv. On Fedora: sudo dnf install python3. On Arch: sudo pacman -S python. On openSUSE: sudo zypper install python3. On Alpine: sudo apk add python3. Then re-run this script."
     fi
     fail "could not create the virtual environment: $(head -n 1 "$ERR_FILE")"
 fi
