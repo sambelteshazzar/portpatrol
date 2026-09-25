@@ -67,6 +67,21 @@ def test_main_scan_survives_invalid_user_kb_risk(monkeypatch, tmp_path, capsys):
     assert "unknown" in captured.out
 
 
+def test_run_scan_builds_service_index_once(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [40000], identify_service="redis")
+    from portpatrol import knowledge
+    calls = []
+    original = knowledge.service_index
+
+    def counting_index(kb):
+        calls.append(1)
+        return original(kb)
+
+    monkeypatch.setattr(knowledge, "service_index", counting_index)
+    assert cli.main(["scan", "--no-notify", "--ports", "40000"]) == 1
+    assert len(calls) == 1
+
+
 def test_main_explain(capsys):
     assert cli.main(["explain", "23"]) == 0
     out = capsys.readouterr().out

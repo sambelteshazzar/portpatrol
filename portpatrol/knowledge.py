@@ -100,18 +100,20 @@ def parse_port_spec(spec, top_ports):
     return sorted(ports)
 
 
-def classify_port(kb, port, service=None):
+def classify_port(kb, port, service=None, svc_index=None):
     """Return the risk level for a port.
 
     A port entry wins, then a banner-derived service match, else "unknown".
-    Risk values outside the five known levels read as "unknown".
+    Risk values outside the five known levels read as "unknown". Pass a
+    prebuilt service_index(kb) in svc_index to avoid rebuilding it per call.
     """
     entry = kb.get(port)
     if entry is not None:
         risk = entry.get("risk")
         return risk if risk in VALID_RISKS else "unknown"
     if service:
-        matched = service_index(kb).get(service)
+        index = service_index(kb) if svc_index is None else svc_index
+        matched = index.get(service)
         if matched is not None:
             risk = matched.get("risk")
             return risk if risk in VALID_RISKS else "unknown"

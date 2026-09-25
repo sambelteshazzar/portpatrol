@@ -97,7 +97,7 @@ def run_scan(args):
         f["process"] = info.get("process")
         f["exposure"] = listeners.classify_exposure(info.get("bind"))
         service = f["service"] if f["service"] not in (None, "unknown") else None
-        risk = knowledge.classify_port(kb, f["port"], service)
+        risk = knowledge.classify_port(kb, f["port"], service, svc_index)
         f["risk"] = knowledge.adjust_risk_for_exposure(risk, f["exposure"])
         f["cves"] = []
 
