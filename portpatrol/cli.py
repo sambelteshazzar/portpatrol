@@ -68,7 +68,7 @@ def run_scan(args):
         print(f"portpatrol: {exc}", file=sys.stderr)
         return ScanOutcome(2, None, None, False)
 
-    kb = knowledge.load_knowledge_base()
+    kb, kb_meta = knowledge.load_knowledge_base_with_source()
     svc_index = knowledge.service_index(kb)
 
     open_ports = scanner.sweep(ports)
@@ -128,6 +128,10 @@ def run_scan(args):
         "target": "127.0.0.1",
         "scanned": len(ports),
         "open": findings,
+        "knowledge_base_source": kb_meta["source"],
+        "knowledge_base_path": kb_meta["path"],
+        "knowledge_base_entries": kb_meta["entries"],
+        "knowledge_base_repaired": kb_meta["repaired"],
     }
     if args.diff:
         result["changes"] = changes
@@ -236,7 +240,11 @@ def cmd_watch(args):
 
 
 def cmd_explain(args):
-    kb = knowledge.load_knowledge_base()
+    kb, kb_meta = knowledge.load_knowledge_base_with_source()
+    source = kb_meta["source"]
+    path = kb_meta["path"]
+    print(f"Knowledge base: {source} ({path})" if path
+          else f"Knowledge base: {source}")
     entry = knowledge.get_entry(kb, args.port)
     if entry is None:
         print(f"No knowledge base entry for port {args.port}.")

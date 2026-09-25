@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from portpatrol import banner, cli
+from portpatrol import banner, cli, knowledge
 
 
 def test_parser_defaults():
@@ -95,6 +95,75 @@ def test_main_explain_unknown_port(capsys):
     assert "unknown" in out
 
 
+def _entry(port, risk="info"):
+    return {"port": port, "protocol": "tcp", "service": "ssh", "risk": risk,
+            "banner_first": False, "probe": None, "match": [],
+            "advice": "test advice", "kev_hints": []}
+
+
+def _patch_kb_loader(monkeypatch, entries, meta):
+    monkeypatch.setattr(
+        knowledge, "load_knowledge_base_with_source",
+        lambda user_path=None: (entries, meta))
+
+
+def test_scan_json_includes_knowledge_base_metadata(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    _patch_kb_loader(monkeypatch, {22: _entry(22)}, {
+        "source": "package", "path": str(knowledge.PACKAGE_KB),
+        "entries": 1, "repaired": 0})
+    assert cli.main(["scan", "--no-notify", "--json", "--ports", "22"]) == 1
+    out = json.loads(capsys.readouterr().out)
+    assert out["knowledge_base_source"] == "package"
+    assert out["knowledge_base_path"] == str(knowledge.PACKAGE_KB)
+    assert out["knowledge_base_entries"] == 1
+    assert out["knowledge_base_repaired"] == 0
+
+
+def test_scan_json_reports_user_source_and_repaired(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    path = tmp_path / "kb.json"
+    _patch_kb_loader(monkeypatch, {22: _entry(22)}, {
+        "source": "user", "path": str(path), "entries": 4, "repaired": 2})
+    cli.main(["scan", "--no-notify", "--json", "--ports", "22"])
+    out = json.loads(capsys.readouterr().out)
+    assert out["knowledge_base_source"] == "user"
+    assert out["knowledge_base_path"] == str(path)
+    assert out["knowledge_base_entries"] == 4
+    assert out["knowledge_base_repaired"] == 2
+
+
+def test_explain_reports_knowledge_base_source(monkeypatch, capsys, tmp_path):
+    path = tmp_path / "kb.json"
+    _patch_kb_loader(monkeypatch, {22: _entry(22)}, {
+        "source": "user", "path": str(path), "entries": 1, "repaired": 0})
+    assert cli.main(["explain", "22"]) == 0
+    out = capsys.readouterr().out
+    assert f"Knowledge base: user ({path})" in out
+    assert "Port 22/tcp — ssh" in out
+
+
+def test_explain_reports_source_for_unknown_port(monkeypatch, capsys, tmp_path):
+    path = tmp_path / "kb.json"
+    _patch_kb_loader(monkeypatch, {22: _entry(22)}, {
+        "source": "user", "path": str(path), "entries": 1, "repaired": 0})
+    assert cli.main(["explain", "40000"]) == 0
+    out = capsys.readouterr().out
+    assert f"Knowledge base: user ({path})" in out
+    assert "No knowledge base entry for port 40000." in out
+    assert "unknown" in out
+
+
+def test_explain_reports_defaults_source_without_path(monkeypatch, capsys):
+    _patch_kb_loader(monkeypatch, {22: _entry(22)}, {
+        "source": "defaults", "path": None,
+        "entries": 1, "repaired": 0})
+    assert cli.main(["explain", "22"]) == 0
+    out = capsys.readouterr().out
+    assert "Knowledge base: defaults" in out
+    assert "Knowledge base: defaults (" not in out
+
+
 def test_diff_flag_exists():
     args = cli.build_parser().parse_args(["scan", "--diff"])
     assert args.diff is True
@@ -160,6 +229,17 @@ def test_diff_json_includes_changes(monkeypatch, tmp_path, capsys):
     out = _json.loads(capsys.readouterr().out)
     assert out["baseline"] is False
     assert [f["port"] for f in out["changes"]["new"]] == [22]
+
+
+def test_diff_state_keeps_slim_open_entry_keys(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    assert cli.main(["scan", "--diff", "--json", "--no-notify", "--ports", "22"]) == 1
+    out = json.loads(capsys.readouterr().out)
+    assert out["knowledge_base_source"] in ("user", "package", "defaults")
+    state = json.loads((tmp_path / "state.json").read_text(encoding="utf-8"))
+    assert state["open"]
+    for entry in state["open"]:
+        assert set(entry) == {"port", "service", "version", "risk"}
 
 
 def test_non_diff_runs_do_not_touch_state(monkeypatch, tmp_path):

@@ -92,12 +92,15 @@ A default scan here takes about 13 seconds, most of it inside nmap version detec
 
 ```
 $ portpatrol explain 6379
+Knowledge base: user (/home/you/.portpatrol/knowledge_base.json)
 Port 6379/tcp — redis — risk: critical
 Advice: Unauthenticated Redis is a root-install path (cron and SSH key writes). Require auth, bind to localhost, and keep patched.
 KEV hints: redis
 ```
 
-Ports with no knowledge base entry print a note saying so and tell you to work out by hand what is listening. Either way the exit code is 0.
+The first line names the knowledge base the answer came from: `user` for your `~/.portpatrol/knowledge_base.json`, `package` for the file shipped with PortPatrol, and `defaults` for the built-in entries, which have no file and print without a path. The same four `knowledge_base_*` fields appear in `--json` scan output.
+
+Ports with no knowledge base entry print a note saying so and tell you to work out by hand what is listening. The source line is printed either way, so an unknown port still tells you which data set was searched. Either way the exit code is 0.
 
 ## watch
 
@@ -119,7 +122,7 @@ portpatrol: cycle 3 open=2 changes=0
 
 ## Change detection
 
-`scan --diff` and `watch` share one baseline: `~/.portpatrol/state.json`, which holds the port, service, version, and risk of every open port from the last run. The next run reports three kinds of change: ports that appeared, ports that disappeared, and ports whose service or version moved. A run with no saved state establishes the baseline instead.
+`scan --diff` and `watch` share one baseline: `~/.portpatrol/state.json`, which holds the port, service, version, and risk of every open port from the last run. Nothing else goes in, so the knowledge base metadata reported for a run does not end up in the baseline. The next run reports three kinds of change: ports that appeared, ports that disappeared, and ports whose service or version moved. A run with no saved state establishes the baseline instead.
 
 The console table prints in full on every `scan --diff` run. Change alerts go out as notifications: a summary toast for the baseline, a change toast afterward, plus a separate toast for each newly opened critical port. Scripts that want the change data should use `--json`, which adds `changes` and `baseline` keys to the result document.
 
@@ -185,9 +188,15 @@ $ portpatrol scan --ports 631 --json
       "confidence": "medium",
       "cves": []
     }
-  ]
+  ],
+  "knowledge_base_source": "package",
+  "knowledge_base_path": "/home/you/.portpatrol/venv/lib/python3.12/site-packages/portpatrol/knowledge_base.json",
+  "knowledge_base_entries": 45,
+  "knowledge_base_repaired": 0
 }
 ```
+
+The four `knowledge_base_*` fields record which data set supplied the ratings for that run. `knowledge_base_source` is `user` when `~/.portpatrol/knowledge_base.json` was used, `package` when the file shipped with PortPatrol was used, and `defaults` when neither file parsed and the built-in entries in `portpatrol/defaults.py` took over. `knowledge_base_path` is the file that was read, or `null` for `defaults`. `knowledge_base_entries` counts the entries in that source. `knowledge_base_repaired` counts entries whose `risk` value was missing or invalid and was reset to `unknown` on load, with a warning on stderr. That count is a data-quality signal about your knowledge base file, not a vulnerability result: a repaired entry never supplies a rating, and the ports it covers read as `unknown`.
 
 `pid` and `process` come from the OS listener table. They read `null` when the owning process belongs to another user and the kernel hides it from you. `risk_source` records how the estimate was selected: `port_rule` for a knowledge-base entry for the exact port, `service_rule` for a service-name match, `exposure_adjusted` when a loopback binding lowered the selected rating, or `fallback` when neither rule matched. `confidence` is `high` for a direct port or service rule, `medium` for an exposure-adjusted result, and `low` for a fallback. With `--diff` the document also carries `changes` (`new`, `removed`, `changed`) and `baseline`.
 
@@ -220,7 +229,7 @@ The file loads in this order, and the first one that parses wins:
 2. the packaged `portpatrol/knowledge_base.json`
 3. the built-in defaults in `portpatrol/defaults.py`, with a warning on stderr
 
-Your file replaces the packaged one. It does not merge, so copy across the entries you want to keep before you start editing. The packaged file and the built-in defaults are identical lists of 45 ports.
+Your file replaces the packaged one. It does not merge, so copy across the entries you want to keep before you start editing. The packaged file and the built-in defaults are identical lists of 45 ports. Every run reports which of the three it used: `portpatrol explain PORT` prints it as a source line, and `--json` scans carry it in `knowledge_base_source` with the path, entry count, and repaired-entry count alongside.
 
 An entry looks like this:
 

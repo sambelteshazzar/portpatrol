@@ -59,23 +59,40 @@ def _load_json_entries(path: Path):
     return [_normalize_risk(e, path) for e in entries]
 
 
-def load_knowledge_base(user_path=None):
-    """Resolve the knowledge base: user override, home file, package file, defaults.
+def load_knowledge_base_with_source(user_path=None):
+    """Resolve the knowledge base and report which file supplied it.
 
-    Prints a warning on stderr when falling back to defaults.
-    Returns {port: entry}.
+    Resolution order is an explicit user path, the home file, the package
+    file, then the built-in defaults. Returns ({port: entry}, metadata) where
+    metadata is {"source", "path", "entries", "repaired"}.
     """
     candidates = []
     if user_path is not None:
-        candidates.append(Path(user_path))
-    candidates.append(Path.home() / ".portpatrol" / "knowledge_base.json")
-    candidates.append(PACKAGE_KB)
-    for path in candidates:
+        candidates.append((Path(user_path), "user"))
+    candidates.append((Path.home() / ".portpatrol" / "knowledge_base.json", "user"))
+    candidates.append((PACKAGE_KB, "package"))
+    for path, source in candidates:
         entries = _load_json_entries(path)
         if entries:
-            return {e["port"]: e for e in entries}
+            return ({e["port"]: e for e in entries}, {
+                "source": source,
+                "path": str(path),
+                "entries": len(entries),
+                "repaired": sum(1 for e in entries if e.get(RISK_REPAIRED_KEY)),
+            })
     print("portpatrol: knowledge base not found or invalid; using built-in defaults", file=sys.stderr)
-    return {e["port"]: e for e in DEFAULT_ENTRIES}
+    return ({e["port"]: e for e in DEFAULT_ENTRIES}, {
+        "source": "defaults",
+        "path": None,
+        "entries": len(DEFAULT_ENTRIES),
+        "repaired": 0,
+    })
+
+
+def load_knowledge_base(user_path=None):
+    """Return the knowledge base entries as {port: entry}."""
+    entries, _ = load_knowledge_base_with_source(user_path)
+    return entries
 
 
 def get_entry(kb, port):

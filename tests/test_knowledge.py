@@ -103,6 +103,80 @@ def test_load_knowledge_base_valid_risk_is_silent(tmp_path, capsys):
     assert capsys.readouterr().err == ""
 
 
+def _write_kb(path, port=22, risk="info"):
+    entry = {"port": port, "protocol": "tcp", "service": "ssh",
+             "risk": risk, "banner_first": False, "probe": None,
+             "match": [], "advice": "test advice", "kev_hints": []}
+    path.write_text(json.dumps([entry]), encoding="utf-8")
+    return path
+
+
+def test_load_with_source_reports_user_file(tmp_path):
+    path = _write_kb(tmp_path / "kb.json", 22, "info")
+    entries, meta = knowledge.load_knowledge_base_with_source(user_path=path)
+    assert list(entries) == [22]
+    assert meta == {"source": "user", "path": str(path), "entries": 1, "repaired": 0}
+
+
+def test_load_with_source_reports_package(monkeypatch, tmp_path):
+    monkeypatch.setattr(knowledge.Path, "home", lambda: tmp_path)
+    entries, meta = knowledge.load_knowledge_base_with_source()
+    assert meta["source"] == "package"
+    assert meta["path"] == str(knowledge.PACKAGE_KB)
+    assert meta["entries"] == len(entries)
+    assert meta["repaired"] == 0
+
+
+def test_load_with_source_missing_user_falls_back_to_package(monkeypatch, tmp_path):
+    monkeypatch.setattr(knowledge.Path, "home", lambda: tmp_path)
+    entries, meta = knowledge.load_knowledge_base_with_source(
+        user_path=tmp_path / "missing.json")
+    assert meta["source"] == "package"
+    assert meta["path"] == str(knowledge.PACKAGE_KB)
+    assert meta["entries"] == len(entries)
+
+
+def test_load_with_source_invalid_package_falls_back_to_defaults(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(knowledge.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(knowledge, "PACKAGE_KB", tmp_path / "missing.json")
+    entries, meta = knowledge.load_knowledge_base_with_source()
+    assert entries == {e["port"]: e for e in DEFAULT_ENTRIES}
+    assert meta == {"source": "defaults", "path": None,
+                    "entries": len(DEFAULT_ENTRIES), "repaired": 0}
+    err = capsys.readouterr().err
+    assert "not found or invalid" in err
+
+
+def test_load_with_source_counts_repaired_entries(tmp_path, capsys):
+    path = tmp_path / "kb.json"
+    path.write_text(json.dumps([
+        {"port": 9999, "protocol": "tcp", "service": "testsvc", "risk": "extreme",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []},
+        {"port": 9998, "protocol": "tcp", "service": "othersvc",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []},
+        {"port": 9997, "protocol": "tcp", "service": "goodsvc", "risk": "high",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []},
+    ]), encoding="utf-8")
+    entries, meta = knowledge.load_knowledge_base_with_source(user_path=path)
+    assert meta == {"source": "user", "path": str(path), "entries": 3, "repaired": 2}
+    assert sorted(entries) == [9997, 9998, 9999]
+    assert entries[9999]["risk"] == "unknown"
+    assert entries[9998]["risk"] == "unknown"
+    err = capsys.readouterr().err
+    assert "invalid risk" in err
+    assert "missing" in err
+
+
+def test_load_knowledge_base_wrapper_returns_dict(tmp_path):
+    path = _write_kb(tmp_path / "kb.json", 22, "info")
+    kb = knowledge.load_knowledge_base(user_path=path)
+    assert isinstance(kb, dict)
+    assert kb[22]["service"] == "ssh"
+
+
 def test_classify_port_invalid_risk_returns_unknown():
     kb = {23: {"port": 23, "service": "telnet", "risk": "extreme"}}
     assert knowledge.classify_port(kb, 23) == "unknown"
