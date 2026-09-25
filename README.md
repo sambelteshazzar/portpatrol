@@ -57,14 +57,22 @@ PYTHONPATH=. python3 -m portpatrol scan
 
 ## scan
 
+Running `portpatrol` with no subcommand prints this wordmark and runs the same scan with the default options. The wordmark goes to stderr and the table to stdout:
+
 ```
-$ portpatrol scan
+$ portpatrol
+ ____            _   ____       _             _
+|  _ \ ___  _ __| |_|  _ \ __ _| |_ _ __ ___ | |
+| |_) / _ \| '__| __| |_) / _` | __| '__/ _ \| |
+|  __/ (_) | |  | |_|  __/ (_| | |_| | | (_) | |
+|_|   \___/|_|   \__|_|   \__,_|\__|_|  \___/|_|
+
   PORT  RISK     EXPOSURE  SERVICE          VERSION        PROCESS        CVES
   8000  🟡 medium  interface http-alt         -              MainThread     
    631  🔵 info    loopback  ipp              2.4            -              
 ```
 
-Running `portpatrol` with no subcommand runs this same scan with the default options. Flags belong to `portpatrol scan`, which takes everything shown below.
+Flags belong to `portpatrol scan`, which takes everything shown below.
 
 Two ports are open on the machine that produced this output. Port 631 runs CUPS, listens on 127.0.0.1 only, and shows `info` because the knowledge base rates IPP as `medium` and the loopback binding drops every risk one level. Port 8000 listens on all interfaces and keeps its `medium` rating. `MainThread` is what the kernel reports as the process name for that listener.
 
@@ -271,4 +279,4 @@ The service file calls `%h/portpatrol/bin/portpatrol`, so edit `ExecStart` if yo
 python3 -m pytest
 ```
 
-from the repository root. 122 tests cover the sweep, banner and probe matching, nmap and KEV enrichment with mocked subprocesses, the listener parsers, the diff engine, notifications, rendering, the CLI including watch cycles, and the installers. The suite runs against real listeners bound to ephemeral ports, and `install.sh` is exercised end to end against a scratch home directory.
+from the repository root. 127 tests cover the sweep, banner and probe matching, nmap and KEV enrichment with mocked subprocesses, the listener parsers, the diff engine, notifications, rendering, the CLI including watch cycles, and the installers. The suite runs against real listeners bound to ephemeral ports, and `install.sh` is exercised end to end against a scratch home directory.

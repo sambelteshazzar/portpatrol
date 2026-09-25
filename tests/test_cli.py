@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from portpatrol import cli
+from portpatrol import banner, cli
 
 
 def test_parser_defaults():
@@ -437,3 +437,22 @@ def test_bare_unknown_flag_exits_two():
     with pytest.raises(SystemExit) as exc:
         cli.build_parser().parse_args(["--json"])
     assert exc.value.code == 2
+
+
+def test_bare_invocation_prints_banner_to_stderr(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(cli, "HISTORY_PATH", tmp_path / "history.json")
+    monkeypatch.setattr("portpatrol.scanner.sweep", lambda ports, **kw: [])
+    monkeypatch.setattr(cli, "notify", lambda t, b: True)
+    assert cli.main([]) == 0
+    captured = capsys.readouterr()
+    first_row = banner.BANNER.splitlines()[0]
+    assert captured.err.startswith(first_row)
+    assert first_row not in captured.out
+    assert "No open ports" in captured.out
+
+
+def test_scan_prints_no_banner(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [])
+    assert cli.main(["scan", "--no-notify"]) == 0
+    captured = capsys.readouterr()
+    assert banner.BANNER.splitlines()[0] not in captured.err

@@ -9,7 +9,7 @@ from collections import namedtuple
 from datetime import datetime, timezone
 from pathlib import Path
 
-from portpatrol import diff, knowledge, listeners, scanner
+from portpatrol import banner, diff, knowledge, listeners, scanner
 from portpatrol.defaults import TOP_PORTS
 from portpatrol.notifier import notify, summary_message
 from portpatrol.report import append_history, console_table, to_json
@@ -249,6 +249,8 @@ def apply_bare_defaults(args):
 def main(argv=None):
     args = apply_bare_defaults(build_parser().parse_args(argv))
     try:
+        if args.command is None:
+            banner.print_banner(sys.stderr)
         return args.func(args)
     except KeyboardInterrupt:
         return 2
