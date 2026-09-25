@@ -6,13 +6,35 @@ The scan side is plain Python 3.8+ with no third-party packages. A scan opens co
 
 ## Install
 
+### Linux
+
+```
+./install.sh
+```
+
+The installer checks for Python 3.8 or newer, builds a virtual environment at `~/.portpatrol/venv`, puts a `portpatrol` command in `~/.local/bin`, and installs the application-menu launcher. Run it again after pulling changes; a second run upgrades the same environment.
+
+On Debian and Ubuntu `python3 -m venv` needs an extra package, and the installer prints the fix (`sudo apt install python3-venv`) when it is missing. The first pip run downloads a small build package, so an internet connection is needed once. If `~/.local/bin` is not on your PATH, the installer prints the line to add to your shell profile.
+
+### Windows
+
+```
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+The PowerShell installer finds `py -3` or `python`, builds `%USERPROFILE%\.portpatrol\venv`, appends `%USERPROFILE%\.portpatrol\bin` to your user PATH, and puts a PortPatrol shortcut in the Start Menu. The PATH write reads and rewrites the registry value in place, so other PATH entries and their types survive, and a broadcast tells new terminals about it. The default execution policy blocks downloaded scripts, which is why the command above uses `Bypass`.
+
+`install.ps1` and `portpatrol.bat` were written and reviewed on Linux; neither file has been executed on Windows.
+
+### From a source checkout
+
 ```
 python3 -m venv .venv
 . .venv/bin/activate
 pip install .
 ```
 
-The last line puts a `portpatrol` command on your PATH. From a source checkout you can skip the install:
+The last line puts a `portpatrol` command on your PATH. To run from the checkout without installing:
 
 ```
 ./bin/portpatrol scan
@@ -27,6 +49,8 @@ $ portpatrol scan
   8000  🟡 medium  interface http-alt         -              MainThread     
    631  🔵 info    loopback  ipp              2.4            -              
 ```
+
+Running `portpatrol` with no subcommand runs this same scan with the default options. Flags belong to `portpatrol scan`, which takes everything shown below.
 
 Two ports are open on the machine that produced this output. Port 631 runs CUPS, listens on 127.0.0.1 only, and shows `info` because the knowledge base rates IPP as `medium` and the loopback binding drops every risk one level. Port 8000 listens on all interfaces and keeps its `medium` rating. `MainThread` is what the kernel reports as the process name for that listener.
 
@@ -114,6 +138,8 @@ portpatrol: invalid port: '99999'
 | 1 | at least one open port | | |
 | 2 | bad arguments or port spec | bad `--interval`, bad port spec, or a failed cycle | |
 
+A bare `portpatrol` uses the `scan` column.
+
 ## JSON output
 
 ```
@@ -200,6 +226,19 @@ PortPatrol creates the directory on first write and keeps every file it saves th
 
 Windows notifications use a PowerShell toast and fall back to a message box if the toast API is unavailable. Both paths share one code base. Only the Linux one has been exercised.
 
+## Double-click launcher
+
+`portpatrol-desktop.sh` opens a terminal, runs a scan, and waits for Enter so the result stays on screen. `install.sh` places it as the `portpatrol` entry in your application menu. Without the installer, copy the desktop file and point its `Exec` line at wherever the wrapper sits:
+
+```
+mkdir -p ~/.local/share/applications
+cp examples/desktop/portpatrol.desktop ~/.local/share/applications/
+```
+
+The shipped `Exec=portpatrol-desktop.sh` resolves through `PATH`; change it to the wrapper's full path if the wrapper is not on `PATH`.
+
+On Windows, the installer's Start Menu shortcut runs `portpatrol-desktop.bat`, which scans and then waits for a key press. From a source checkout the same job falls to `portpatrol.bat` in the repository root: it prefers the installed venv command and otherwise runs `py -3 -m portpatrol`, then pauses.
+
 ## Scheduled scans
 
 Example systemd user units live in `examples/systemd/user/`. They run a daily `scan --ports top1000 --kev --diff` at 09:00 and treat exit code 1 as success:
@@ -218,4 +257,4 @@ The service file calls `%h/portpatrol/bin/portpatrol`, so edit `ExecStart` if yo
 python3 -m pytest
 ```
 
-from the repository root. 100 tests cover the sweep, banner and probe matching, nmap and KEV enrichment with mocked subprocesses, the listener parsers, the diff engine, notifications, rendering, and the CLI including watch cycles. The suite runs against real listeners bound to ephemeral ports.
+from the repository root. 122 tests cover the sweep, banner and probe matching, nmap and KEV enrichment with mocked subprocesses, the listener parsers, the diff engine, notifications, rendering, the CLI including watch cycles, and the installers. The suite runs against real listeners bound to ephemeral ports, and `install.sh` is exercised end to end against a scratch home directory.

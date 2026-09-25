@@ -23,52 +23,52 @@
 
 **Files:** `portpatrol/cli.py`, `tests/test_cli.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `main([])` with a clean sweep returns `0` and prints the all-clear line.
   - `main([])` with a finding returns `1`.
   - `build_parser().format_help()` still lists `scan`, `watch`, `explain`.
   - `parse_args([])` carries scan defaults (`ports == "top1000"`, `json/kev/no_notify/verbose/diff` all `False`, `func` is `cmd_scan`).
-- [ ] **Step 2: Run the tests to verify they fail**
-- [ ] **Step 3: Implement** — `add_subparsers(dest="command", required=False)` plus parser-level `set_defaults`; nothing else changes.
-- [ ] **Step 4: Run the tests to verify they pass**, full suite green.
-- [ ] **Step 5: Commit** `feat: bare portpatrol invocation runs a default scan`
+- [x] **Step 2: Run the tests to verify they fail**
+- [x] **Step 3: Implement**: `add_subparsers(dest="command")` without `required=True`, plus `apply_bare_defaults` filling scan defaults after parse (parser-level `set_defaults` leaked `json`/`diff` onto the watch namespace, which an existing test forbids).
+- [x] **Step 4: Run the tests to verify they pass**, full suite green.
+- [x] **Step 5: Commit** `feat: bare portpatrol invocation runs a default scan`
 
 ### Task 2: Desktop launcher files
 
 **Files:** `portpatrol-desktop.sh`, `examples/desktop/portpatrol.desktop`, `tests/test_launchers.py`
 
-- [ ] **Step 1: Write the failing tests** — desktop file has `Type=Application`, `Terminal=true`, an `Exec` line whose first token is an absolute path with no unquoted reserved characters, `Icon`, `Categories`; the shell wrapper ends with a `read` so the terminal stays open and calls `portpatrol scan`.
-- [ ] **Step 2: Run the tests to verify they fail**
-- [ ] **Step 3: Implement** the wrapper and desktop file (Exec points at `portpatrol-desktop.sh` by absolute path; the installer rewrites it).
-- [ ] **Step 4: Run the tests to verify they pass**
-- [ ] **Step 5: Commit** `feat: desktop launcher and terminal wrapper`
+- [x] **Step 1: Write the failing tests**: desktop file has `Type=Application`, `Terminal=true`, an `Exec` line whose first token is absolute-path-safe per the spec's reserved-character rules, `Icon`, `Categories`; the shell wrapper ends with a `read` so the terminal stays open and calls `portpatrol scan`.
+- [x] **Step 2: Run the tests to verify they fail**
+- [x] **Step 3: Implement** the wrapper and desktop file (bare-name `Exec`, resolved via `PATH`; the installer rewrites it to an absolute path).
+- [x] **Step 4: Run the tests to verify they pass**
+- [x] **Step 5: Commit** `feat: desktop launcher and terminal wrapper`
 
 ### Task 3: install.sh
 
 **Files:** `install.sh`, `tests/test_installers.py`
 
-- [ ] **Step 1: Write the failing tests** — run `bash install.sh` with `HOME` set to `tmp_path` and `PATH` containing the real `python3`; assert `~/.portpatrol/venv` exists, `~/.local/bin/portpatrol` is a symlink into the venv, `~/.local/share/applications/portpatrol.desktop` has an absolute `Exec`, the installed command answers `explain 22` with `ssh`, and a second run exits `0`.
-- [ ] **Step 2: Run the tests to verify they fail**
-- [ ] **Step 3: Implement** `install.sh`: preflight (python3, version, venv, pip), venv build, install, symlink, desktop copy with `Exec` rewrite, `PATH` warning, plain-language failures.
-- [ ] **Step 4: Run the tests to verify they pass**
-- [ ] **Step 5: Commit** `feat: install.sh for Linux`
+- [x] **Step 1: Write the failing tests**: run `bash install.sh` with `HOME` set to `tmp_path` and `PATH` containing the real `python3`; assert `~/.portpatrol/venv` exists, `~/.local/bin/portpatrol` is a symlink into the venv, `~/.local/share/applications/portpatrol.desktop` has an absolute `Exec`, the installed command answers `explain 22` with `ssh`, and a second run exits `0`.
+- [x] **Step 2: Run the tests to verify they fail**
+- [x] **Step 3: Implement** `install.sh`: preflight (python3, version, venv, pip), venv build, install, symlink, desktop copy with `Exec` rewrite, `PATH` warning, plain-language failures. Manually re-verified under `/bin/sh` (not just bash) with a scratch home.
+- [x] **Step 4: Run the tests to verify they pass**
+- [x] **Step 5: Commit** `feat: install.sh for Linux`
 
 ### Task 4: install.ps1 and portpatrol.bat
 
 **Files:** `install.ps1`, `portpatrol.bat`, additions to `tests/test_launchers.py`
 
-- [ ] **Step 1: Write the failing tests** — content assertions: `.bat` ends with `pause`, prefers the installed shim, falls back to `py -3 -m portpatrol`; `install.ps1` contains the registry-preserving PATH helper, the `ExpandString` write, the `WM_SETTINGCHANGE` broadcast, and no `setx`.
-- [ ] **Step 2: Run the tests to verify they fail**
-- [ ] **Step 3: Implement** both files per the spec (Python discovery, venv, shim, PATH, shortcut).
-- [ ] **Step 4: Run the tests to verify they pass**
-- [ ] **Step 5: Commit** `feat: install.ps1 and Windows double-click launcher`
+- [x] **Step 1: Write the failing tests**: content assertions: `.bat` ends with `exit /b` after `pause`, prefers the installed venv entry point, falls back to `py -3 -m portpatrol` with `PYTHONPATH`; `install.ps1` contains the registry-preserving PATH helper, the `ExpandString` write, the `WM_SETTINGCHANGE` broadcast, and no `setx`.
+- [x] **Step 2: Run the tests to verify they fail**
+- [x] **Step 3: Implement** both files per the spec (Python discovery, venv, shim, PATH, shortcut). The double-click `.bat` prefers the installed venv executable; the installer writes a separate no-pause shim so interactive commands stay interactive.
+- [x] **Step 4: Run the tests to verify they pass**
+- [x] **Step 5: Commit** `feat: install.ps1 and Windows double-click launcher`
 
 ### Task 5: README
 
 **Files:** `README.md`
 
 - [ ] **Step 1: Rewrite Install** around `./install.sh` and `install.ps1`, keep the source-checkout paths, document bare `portpatrol`, add launcher instructions, state plainly that Windows files were not executed here.
-- [ ] **Step 2: Slop pass** — no em dashes in prose, sentence-case headings, no bold-label lists, no claim that was not verified in this environment.
+- [ ] **Step 2: Slop pass**: no em dashes in prose, sentence-case headings, no bold-label lists, no claim that was not verified in this environment.
 - [ ] **Step 3: Commit** `docs: installer and bare-invocation instructions`
 
 ### Task 6: Verification
