@@ -67,14 +67,14 @@ $ portpatrol
 |  __/ (_) | |  | |_|  __/ (_| | |_| | | (_) | |
 |_|   \___/|_|   \__|_|   \__,_|\__|_|  \___/|_|
 
-  PORT  RISK     EXPOSURE  SERVICE          VERSION        PROCESS        CVES
-  8000  🟡 medium  interface http-alt         -              MainThread     
-   631  🔵 info    loopback  ipp              2.4            -              
+  PORT  RISK     EXPOSURE  SERVICE          VERSION        PROCESS        SOURCE            CVES
+  8000  🟡 medium  interface http-alt         -              MainThread     port_rule
+   631  🔵 info    loopback  ipp              2.4            -              exposure_adjusted
 ```
 
 Flags belong to `portpatrol scan`, which takes everything shown below.
 
-Two ports are open on the machine that produced this output. Port 631 runs CUPS, listens on 127.0.0.1 only, and shows `info` because the knowledge base rates IPP as `medium` and the loopback binding drops every risk one level. Port 8000 listens on all interfaces and keeps its `medium` rating. `MainThread` is what the kernel reports as the process name for that listener.
+Two ports are open on the machine that produced this output. Port 631 runs CUPS, listens on 127.0.0.1 only, and shows `info` because the knowledge base rates IPP as `medium` and the loopback binding drops every risk one level. Its `SOURCE` value is `exposure_adjusted`. Port 8000 listens on all interfaces, keeps its `medium` rating, and has a `port_rule` source. `MainThread` is what the kernel reports as the process name for that listener.
 
 Options:
 
@@ -84,6 +84,7 @@ Options:
 - `--no-notify` keeps the run quiet on the desktop.
 - `--verbose` writes progress and skipped enrichments to stderr: how many ports answered, when nmap is missing, when the listener table is unavailable.
 - `--diff` compares against the previous scan (see [Change detection](#change-detection)).
+- `--raw` prints observed listener evidence without applying the risk model (see [Raw output](#raw-output)).
 
 A default scan here takes about 13 seconds, most of it inside nmap version detection. Without nmap the sweep and banner probes finish in about a second.
 
@@ -180,17 +181,30 @@ $ portpatrol scan --ports 631 --json
       "process": null,
       "exposure": "loopback",
       "risk": "info",
+      "risk_source": "exposure_adjusted",
+      "confidence": "medium",
       "cves": []
     }
   ]
 }
 ```
 
-`pid` and `process` come from the OS listener table. They read `null` when the owning process belongs to another user and the kernel hides it from you. With `--diff` the document also carries `changes` (`new`, `removed`, `changed`) and `baseline`.
+`pid` and `process` come from the OS listener table. They read `null` when the owning process belongs to another user and the kernel hides it from you. `risk_source` records how the estimate was selected: `port_rule` for a knowledge-base entry for the exact port, `service_rule` for a service-name match, `exposure_adjusted` when a loopback binding lowered the selected rating, or `fallback` when neither rule matched. `confidence` is `high` for a direct port or service rule, `medium` for an exposure-adjusted result, and `low` for a fallback. With `--diff` the document also carries `changes` (`new`, `removed`, `changed`) and `baseline`.
+
+## Raw output
+
+`portpatrol scan --raw` prints the observed fields collected for each open port without printing risk ratings, provenance, confidence, or CVEs:
+
+```
+$ portpatrol scan --raw --ports 631
+port=631 service=ipp version=2.4 product=CUPS exposure=loopback pid=1234 process=cupsd
+```
+
+Raw mode does not write `history.json`, does not create or update the `state.json` diff baseline, does not send notifications, and does not run KEV enrichment. Passing `--diff` or `--kev` with `--raw` does not change those side effects. A raw scan uses the same socket sweep and OS listener inventory as a normal scan.
 
 ## Risk ratings
 
-Each entry in the knowledge base assigns one of five ratings: `critical`, `high`, `medium`, `info`, `unknown`.
+Each entry in the knowledge base assigns one of five ratings: `critical`, `high`, `medium`, `info`, `unknown`. The rating is a knowledge-base estimate for prioritization, not a verified vulnerability or a complete security assessment.
 
 The lookup runs in a fixed order. A knowledge base entry for the open port wins. With no entry, the service name picked up from the banner or from nmap is looked up among the other entries, and a match brings in that entry's rating. A port with neither reads as `unknown`.
 
@@ -230,7 +244,7 @@ An entry looks like this:
 
 | File | Written by | Contents |
 | --- | --- | --- |
-| `history.json` | every scan, changing watch cycles | array of full result documents, oldest first |
+| `history.json` | every normal scan, changing watch cycles | array of full result documents, oldest first |
 | `state.json` | `scan --diff`, `watch` | slim baseline: port, service, version, risk |
 | `allowlist.json` | you | array of port numbers exempt from "new port" alerts |
 | `kev.json` | `--kev` | cached CISA KEV feed, refreshed after 24 hours |
@@ -279,4 +293,4 @@ The service file calls `%h/portpatrol/bin/portpatrol`, so edit `ExecStart` if yo
 python3 -m pytest
 ```
 
-from the repository root. 127 tests cover the sweep, banner and probe matching, nmap and KEV enrichment with mocked subprocesses, the listener parsers, the diff engine, notifications, rendering, the CLI including watch cycles, and the installers. The suite runs against real listeners bound to ephemeral ports, and `install.sh` is exercised end to end against a scratch home directory.
+from the repository root. The tests cover the sweep, banner and probe matching, nmap and KEV enrichment with mocked subprocesses, the listener parsers, the diff engine, notifications, rendering, the CLI including watch cycles, and the installers. Host-dependent integration coverage runs `cli.main` against a real ephemeral loopback listener and the host's OS listener inventory; it skips only when the platform and available listener command cannot support that check. `install.sh` is exercised end to end against a scratch home directory.

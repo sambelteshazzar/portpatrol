@@ -13,17 +13,38 @@ PACKAGE_KB = Path(__file__).resolve().parent / "knowledge_base.json"
 
 VALID_RISKS = frozenset(RISK_ORDER)
 
+RISK_REPAIRED_KEY = "_risk_repaired"
+
+
+def _usable_risk(entry):
+    """Return the entry's risk, or None when the risk was repaired on load.
+
+    A risk that _normalize_risk had to downgrade to "unknown" carries no
+    estimate, so it must not stand in as a port or service rule. An entry that
+    genuinely rates a port "unknown" is still a valid rule.
+    """
+    risk = entry.get("risk")
+    if risk not in VALID_RISKS or entry.get(RISK_REPAIRED_KEY):
+        return None
+    return risk
+
 
 def _normalize_risk(entry, path):
-    """Return entry with a guaranteed-valid risk, warning on stderr when fixed."""
+    """Return entry with a guaranteed-valid risk, warning on stderr when fixed.
+
+    A risk that had to be repaired is marked so classification can tell a
+    downgraded entry apart from one that legitimately rates the port unknown.
+    """
     if "risk" not in entry:
         print(f"portpatrol: {path}: missing 'risk' for port {entry['port']}; using 'unknown'",
               file=sys.stderr)
         entry["risk"] = "unknown"
+        entry[RISK_REPAIRED_KEY] = True
     elif entry["risk"] not in VALID_RISKS:
         print(f"portpatrol: {path}: invalid risk {entry['risk']!r} for port {entry['port']}; "
               f"using 'unknown'", file=sys.stderr)
         entry["risk"] = "unknown"
+        entry[RISK_REPAIRED_KEY] = True
     return entry
 
 
@@ -64,7 +85,8 @@ def get_entry(kb, port):
 
 def service_index(kb):
     """Map service name to entry for banner-derived classification."""
-    return {e["service"]: e for e in kb.values() if e.get("service")}
+    return {e["service"]: e for e in kb.values()
+            if e.get("service") and _usable_risk(e) is not None}
 
 
 def parse_port_spec(spec, top_ports):
@@ -100,24 +122,32 @@ def parse_port_spec(spec, top_ports):
     return sorted(ports)
 
 
-def classify_port(kb, port, service=None, svc_index=None):
-    """Return the risk level for a port.
-
-    A port entry wins, then a banner-derived service match, else "unknown".
-    Risk values outside the five known levels read as "unknown". Pass a
-    prebuilt service_index(kb) in svc_index to avoid rebuilding it per call.
-    """
+def classify_port_with_source(kb, port, service=None, svc_index=None):
+    """Return the risk, source, and confidence for a port."""
     entry = kb.get(port)
     if entry is not None:
-        risk = entry.get("risk")
-        return risk if risk in VALID_RISKS else "unknown"
+        risk = _usable_risk(entry)
+        if risk is not None:
+            return risk, "port_rule", "high"
     if service:
         index = service_index(kb) if svc_index is None else svc_index
         matched = index.get(service)
         if matched is not None:
-            risk = matched.get("risk")
-            return risk if risk in VALID_RISKS else "unknown"
-    return "unknown"
+            risk = _usable_risk(matched)
+            if risk is not None:
+                return risk, "service_rule", "high"
+    return "unknown", "fallback", "low"
+
+
+def classify_port(kb, port, service=None, svc_index=None):
+    """Return the risk level for a port.
+
+    A port entry wins, then a banner-derived service match, else "unknown".
+    Risk values outside the five known levels, and entries whose risk was
+    repaired on load, do not stand in as rules. Pass a prebuilt
+    service_index(kb) in svc_index to avoid rebuilding it per call.
+    """
+    return classify_port_with_source(kb, port, service, svc_index)[0]
 
 
 _LOOPBACK_DOWNGRADE = {"critical": "high", "high": "medium", "medium": "info"}

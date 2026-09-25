@@ -14,15 +14,31 @@ def console_table(findings):
         return "✅ No open ports found."
     ordered = sorted(findings, key=lambda f: RISK_ORDER.index(f["risk"]))
     lines = [f"{'PORT':>6}  {'RISK':<8} {'EXPOSURE':<9} {'SERVICE':<16} "
-             f"{'VERSION':<14} {'PROCESS':<14} CVES"]
+             f"{'VERSION':<14} {'PROCESS':<14} {'SOURCE':<17} CVES"]
     for f in ordered:
         cves = ", ".join(f.get("cves", []))
         exposure = f.get("exposure") or "-"
         process = f.get("process") or "-"
+        source = f.get("risk_source") or "-"
         lines.append(
             f"{f['port']:>6}  {EMOJI[f['risk']]} {f['risk']:<7} "
             f"{exposure:<9} {f.get('service') or 'unknown':<16} "
-            f"{(f.get('version') or '-'):<14} {process:<14} {cves}"
+            f"{(f.get('version') or '-'):<14} {process:<14} {source:<17} {cves}"
+        )
+    return "\n".join(lines)
+
+
+def raw_lines(findings):
+    """Render observed evidence per finding without risk interpretation."""
+    if not findings:
+        return "No open ports found."
+    lines = []
+    for f in findings:
+        lines.append(
+            f"port={f['port']} service={f.get('service') or 'unknown'} "
+            f"version={f.get('version') or '-'} product={f.get('product') or '-'} "
+            f"exposure={f.get('exposure') or '-'} pid={f.get('pid') or '-'} "
+            f"process={f.get('process') or '-'}"
         )
     return "\n".join(lines)
 

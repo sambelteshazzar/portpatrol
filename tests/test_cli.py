@@ -102,6 +102,10 @@ def test_diff_flag_exists():
     assert args.diff is False
 
 
+def test_scan_raw_parser_flag():
+    assert cli.build_parser().parse_args(["scan", "--raw"]).raw is True
+
+
 def _patch_scan(monkeypatch, tmp_path, open_ports, identify_service="ssh"):
     monkeypatch.setattr(cli, "HISTORY_PATH", tmp_path / "history.json")
     monkeypatch.setattr(cli, "STATE_PATH", tmp_path / "state.json")
@@ -220,6 +224,27 @@ def test_findings_json_include_exposure_fields(monkeypatch, tmp_path, capsys):
     assert f["pid"] == 1
     assert f["process"] == "sshd"
     assert f["risk"] == "info"
+
+
+def test_run_scan_marks_loopback_risk_adjustment(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [23], identify_service="telnet")
+    monkeypatch.setattr("portpatrol.listeners.collect_listeners",
+                        lambda: {23: {"pid": 1, "process": "telnetd", "bind": "127.0.0.1"}})
+    args = cli.build_parser().parse_args(["scan", "--ports", "23"])
+    finding = cli.run_scan(args).result["open"][0]
+    assert finding["risk"] == "high"
+    assert finding["risk_source"] == "exposure_adjusted"
+    assert finding["confidence"] == "medium"
+
+
+def test_run_scan_marks_unknown_risk_fallback(monkeypatch, tmp_path):
+    _patch_scan(monkeypatch, tmp_path, [40000], identify_service="unknown")
+    monkeypatch.setattr("portpatrol.listeners.collect_listeners", dict)
+    args = cli.build_parser().parse_args(["scan", "--ports", "40000"])
+    finding = cli.run_scan(args).result["open"][0]
+    assert finding["risk"] == "unknown"
+    assert finding["risk_source"] == "fallback"
+    assert finding["confidence"] == "low"
 
 
 def test_run_scan_returns_outcome_without_side_effects(monkeypatch, tmp_path, capsys):
@@ -412,6 +437,49 @@ def test_watch_cycle_error_exits_two(monkeypatch, tmp_path, capsys):
     assert slept == []
 
 
+def test_scan_raw_prints_evidence_without_side_effects(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [18083], identify_service="unknown")
+    calls = []
+    monkeypatch.setattr(cli, "notify", lambda t, b: calls.append((t, b)) or True)
+
+    result = cli.main(["scan", "--raw", "--ports", "18083"])
+
+    assert result == 1
+    out = capsys.readouterr().out
+    assert "port=18083" in out
+    assert "risk=" not in out
+    assert calls == []
+    assert not (tmp_path / "state.json").exists()
+    assert not (tmp_path / "history.json").exists()
+
+
+def test_scan_raw_disables_diff(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [18083], identify_service="unknown")
+    monkeypatch.setattr(cli, "ALLOWLIST_PATH", tmp_path / "allowlist.json")
+
+    result = cli.main([
+        "scan", "--raw", "--diff", "--no-notify", "--ports", "18083"
+    ])
+
+    assert result == 1
+    assert "port=18083" in capsys.readouterr().out
+    assert not (tmp_path / "state.json").exists()
+    assert not (tmp_path / "history.json").exists()
+
+
+def test_scan_raw_disables_kev(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [18083], identify_service="unknown")
+    calls = []
+    monkeypatch.setattr("portpatrol.scanner.enrich_with_kev",
+                        lambda *a, **kw: calls.append(1))
+
+    result = cli.main(["scan", "--raw", "--kev", "--no-notify", "--ports", "18083"])
+
+    assert result == 1
+    assert "port=18083" in capsys.readouterr().out
+    assert calls == []
+
+
 def test_bare_invocation_carries_scan_defaults():
     args = cli.apply_bare_defaults(cli.build_parser().parse_args([]))
     assert args.ports == "top1000"
@@ -420,6 +488,7 @@ def test_bare_invocation_carries_scan_defaults():
     assert args.no_notify is False
     assert args.verbose is False
     assert args.diff is False
+    assert args.raw is False
     assert args.func is cli.cmd_scan
 
 

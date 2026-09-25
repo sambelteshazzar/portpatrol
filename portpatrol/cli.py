@@ -12,7 +12,7 @@ from pathlib import Path
 from portpatrol import banner, diff, knowledge, listeners, scanner
 from portpatrol.defaults import TOP_PORTS
 from portpatrol.notifier import notify, summary_message
-from portpatrol.report import append_history, console_table, to_json
+from portpatrol.report import append_history, console_table, raw_lines, to_json
 
 HISTORY_PATH = Path.home() / ".portpatrol" / "history.json"
 STATE_PATH = Path.home() / ".portpatrol" / "state.json"
@@ -37,6 +37,8 @@ def build_parser():
     scan.add_argument("--verbose", action="store_true", help="log skipped enrichments and probe failures")
     scan.add_argument("--diff", action="store_true",
                       help="compare with the last scan; alert only on changes")
+    scan.add_argument("--raw", action="store_true",
+                      help="print observed port evidence without risk interpretation")
     scan.set_defaults(func=cmd_scan)
 
     watch = sub.add_parser("watch", help="continuously scan and alert only on changes")
@@ -97,8 +99,15 @@ def run_scan(args):
         f["process"] = info.get("process")
         f["exposure"] = listeners.classify_exposure(info.get("bind"))
         service = f["service"] if f["service"] not in (None, "unknown") else None
-        risk = knowledge.classify_port(kb, f["port"], service, svc_index)
+        risk, risk_source, confidence = knowledge.classify_port_with_source(
+            kb, f["port"], service, svc_index
+        )
         f["risk"] = knowledge.adjust_risk_for_exposure(risk, f["exposure"])
+        if f["risk"] != risk:
+            risk_source = "exposure_adjusted"
+            confidence = "medium"
+        f["risk_source"] = risk_source
+        f["confidence"] = confidence
         f["cves"] = []
 
     if args.kev:
@@ -127,8 +136,14 @@ def run_scan(args):
 
 
 def cmd_scan(args):
+    if args.raw:
+        args.diff = False
+        args.kev = False
     outcome = run_scan(args)
     if outcome.result is None:
+        return outcome.exit_code
+    if args.raw:
+        print(raw_lines(outcome.result["open"]))
         return outcome.exit_code
     findings = outcome.result["open"]
 
@@ -244,6 +259,7 @@ def apply_bare_defaults(args):
         args.no_notify = False
         args.verbose = False
         args.diff = False
+        args.raw = False
     return args
 
 

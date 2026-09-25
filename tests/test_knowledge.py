@@ -111,6 +111,56 @@ def test_classify_port_invalid_risk_returns_unknown():
     assert knowledge.classify_port(kb, 40000, service="notaservice") == "unknown"
 
 
+def test_classify_port_with_source_uses_port_rule():
+    kb = {22: {"port": 22, "service": "ssh", "risk": "info"}}
+    assert knowledge.classify_port_with_source(kb, 22) == ("info", "port_rule", "high")
+
+
+def test_classify_port_with_source_uses_service_rule():
+    kb = {22: {"port": 22, "service": "ssh", "risk": "info"}}
+    assert knowledge.classify_port_with_source(kb, 2222, "ssh") == (
+        "info", "service_rule", "high"
+    )
+
+
+def test_classify_port_with_source_falls_back():
+    assert knowledge.classify_port_with_source({}, 40000) == (
+        "unknown", "fallback", "low"
+    )
+
+
+def test_repaired_risk_is_not_a_port_rule(tmp_path, capsys):
+    user_kb = tmp_path / "knowledge_base.json"
+    user_kb.write_text(json.dumps([
+        {"port": 9999, "protocol": "tcp", "service": "testsvc", "risk": "extreme",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []},
+        {"port": 9998, "protocol": "tcp", "service": "othersvc",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []},
+    ]), encoding="utf-8")
+    kb = knowledge.load_knowledge_base(user_path=user_kb)
+    assert kb[9999]["risk"] == "unknown"
+    assert knowledge.classify_port_with_source(kb, 9999) == ("unknown", "fallback", "low")
+    assert knowledge.classify_port_with_source(kb, 9998) == ("unknown", "fallback", "low")
+    assert knowledge.service_index(kb) == {}
+
+
+def test_explicit_unknown_risk_stays_a_port_rule(tmp_path, capsys):
+    user_kb = tmp_path / "knowledge_base.json"
+    user_kb.write_text(json.dumps([
+        {"port": 9999, "protocol": "tcp", "service": "testsvc", "risk": "unknown",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []}
+    ]), encoding="utf-8")
+    kb = knowledge.load_knowledge_base(user_path=user_kb)
+    assert knowledge.classify_port_with_source(kb, 9999) == ("unknown", "port_rule", "high")
+    assert knowledge.classify_port_with_source(kb, 9997, "testsvc") == (
+        "unknown", "service_rule", "high"
+    )
+    assert capsys.readouterr().err == ""
+
+
 def test_service_index_maps_names_to_entries():
     kb = knowledge.load_knowledge_base()
     idx = knowledge.service_index(kb)
