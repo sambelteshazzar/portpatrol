@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -7,6 +10,9 @@ from portpatrol.defaults import DEFAULT_ENTRIES, TOP_PORTS
 
 REQUIRED_KEYS = {"port", "protocol", "service", "risk", "banner_first", "probe", "match", "advice", "kev_hints"}
 RISKS = {"critical", "high", "medium", "info", "unknown"}
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+GENERATE_SCRIPT = REPO_ROOT / "scripts" / "generate_kb.py"
 
 
 def test_default_entries_validate_against_schema():
@@ -26,6 +32,18 @@ def test_top_ports_list_has_100_unique_ports():
     assert len(set(TOP_PORTS)) == 100
     for known in (80, 443, 22, 3306, 3389, 5900, 6379, 27017):
         assert known in TOP_PORTS
+
+
+def test_packaged_kb_matches_defaults():
+    packaged = json.loads(knowledge.PACKAGE_KB.read_text(encoding="utf-8"))
+    assert packaged == DEFAULT_ENTRIES
+
+
+def test_generate_kb_script_matches_packaged_file(tmp_path):
+    out = tmp_path / "knowledge_base.json"
+    subprocess.run([sys.executable, str(GENERATE_SCRIPT), str(out)],
+                   check=True, cwd=str(REPO_ROOT))
+    assert out.read_bytes() == knowledge.PACKAGE_KB.read_bytes()
 
 
 def test_load_knowledge_base_uses_user_override(tmp_path):
