@@ -7,8 +7,24 @@ import sys
 from pathlib import Path
 
 from portpatrol.defaults import DEFAULT_ENTRIES
+from portpatrol.notifier import RISK_ORDER
 
 PACKAGE_KB = Path(__file__).resolve().parent / "knowledge_base.json"
+
+VALID_RISKS = frozenset(RISK_ORDER)
+
+
+def _normalize_risk(entry, path):
+    """Return entry with a guaranteed-valid risk, warning on stderr when fixed."""
+    if "risk" not in entry:
+        print(f"portpatrol: {path}: missing 'risk' for port {entry['port']}; using 'unknown'",
+              file=sys.stderr)
+        entry["risk"] = "unknown"
+    elif entry["risk"] not in VALID_RISKS:
+        print(f"portpatrol: {path}: invalid risk {entry['risk']!r} for port {entry['port']}; "
+              f"using 'unknown'", file=sys.stderr)
+        entry["risk"] = "unknown"
+    return entry
 
 
 def _load_json_entries(path: Path):
@@ -18,7 +34,8 @@ def _load_json_entries(path: Path):
         return None
     if not isinstance(data, list):
         return None
-    return [e for e in data if isinstance(e, dict) and isinstance(e.get("port"), int)]
+    entries = [e for e in data if isinstance(e, dict) and isinstance(e.get("port"), int)]
+    return [_normalize_risk(e, path) for e in entries]
 
 
 def load_knowledge_base(user_path=None):
@@ -87,14 +104,17 @@ def classify_port(kb, port, service=None):
     """Return the risk level for a port.
 
     A port entry wins, then a banner-derived service match, else "unknown".
+    Risk values outside the five known levels read as "unknown".
     """
     entry = kb.get(port)
     if entry is not None:
-        return entry["risk"]
+        risk = entry.get("risk")
+        return risk if risk in VALID_RISKS else "unknown"
     if service:
         matched = service_index(kb).get(service)
         if matched is not None:
-            return matched["risk"]
+            risk = matched.get("risk")
+            return risk if risk in VALID_RISKS else "unknown"
     return "unknown"
 
 

@@ -46,6 +46,53 @@ def test_load_knowledge_base_invalid_json_falls_back(tmp_path):
     assert 22 in kb
 
 
+def test_load_knowledge_base_invalid_risk_warns_and_downgrades(tmp_path, capsys):
+    user_kb = tmp_path / "knowledge_base.json"
+    user_kb.write_text(json.dumps([
+        {"port": 9999, "protocol": "tcp", "service": "testsvc", "risk": "extreme",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []}
+    ]), encoding="utf-8")
+    kb = knowledge.load_knowledge_base(user_path=user_kb)
+    assert kb[9999]["risk"] == "unknown"
+    err = capsys.readouterr().err
+    assert "invalid risk" in err
+    assert "'extreme'" in err
+    assert "9999" in err
+
+
+def test_load_knowledge_base_missing_risk_warns_and_downgrades(tmp_path, capsys):
+    user_kb = tmp_path / "knowledge_base.json"
+    user_kb.write_text(json.dumps([
+        {"port": 9999, "protocol": "tcp", "service": "testsvc",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []}
+    ]), encoding="utf-8")
+    kb = knowledge.load_knowledge_base(user_path=user_kb)
+    assert kb[9999]["risk"] == "unknown"
+    err = capsys.readouterr().err
+    assert "missing" in err and "risk" in err
+
+
+def test_load_knowledge_base_valid_risk_is_silent(tmp_path, capsys):
+    user_kb = tmp_path / "knowledge_base.json"
+    user_kb.write_text(json.dumps([
+        {"port": 9999, "protocol": "tcp", "service": "testsvc", "risk": "high",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []}
+    ]), encoding="utf-8")
+    knowledge.load_knowledge_base(user_path=user_kb)
+    assert capsys.readouterr().err == ""
+
+
+def test_classify_port_invalid_risk_returns_unknown():
+    kb = {23: {"port": 23, "service": "telnet", "risk": "extreme"}}
+    assert knowledge.classify_port(kb, 23) == "unknown"
+    kb = {23: {"port": 23, "service": "telnet"}}
+    assert knowledge.classify_port(kb, 23) == "unknown"
+    assert knowledge.classify_port(kb, 40000, service="notaservice") == "unknown"
+
+
 def test_service_index_maps_names_to_entries():
     kb = knowledge.load_knowledge_base()
     idx = knowledge.service_index(kb)

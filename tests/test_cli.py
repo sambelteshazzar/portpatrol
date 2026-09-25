@@ -51,6 +51,22 @@ def test_main_scan_notifies_by_default(monkeypatch, tmp_path):
     assert calls[0][0] == "PortPatrol"
 
 
+def test_main_scan_survives_invalid_user_kb_risk(monkeypatch, tmp_path, capsys):
+    _patch_scan(monkeypatch, tmp_path, [22])
+    home = tmp_path / "home"
+    (home / ".portpatrol").mkdir(parents=True)
+    (home / ".portpatrol" / "knowledge_base.json").write_text(json.dumps([
+        {"port": 22, "protocol": "tcp", "service": "ssh", "risk": "extreme",
+         "banner_first": False, "probe": None, "match": [], "advice": "test advice",
+         "kev_hints": []}
+    ]), encoding="utf-8")
+    monkeypatch.setattr("portpatrol.knowledge.Path.home", lambda: home)
+    assert cli.main(["scan", "--no-notify", "--ports", "22"]) == 1
+    captured = capsys.readouterr()
+    assert "invalid risk" in captured.err
+    assert "unknown" in captured.out
+
+
 def test_main_explain(capsys):
     assert cli.main(["explain", "23"]) == 0
     out = capsys.readouterr().out
